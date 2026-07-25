@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>mynhp_bot</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>mynhp_bot Tools</h1>
+            <p class="subtitle">Useful tools at your fingertips</p>
+        </header>
+
+        <nav class="tool-grid">
+            <button class="tool-card" onclick="openTool('text-reverse')">
+                <span class="tool-icon">&#x1F504;</span>
+                <span class="tool-name">Text Reverse</span>
+            </button>
+            <button class="tool-card" onclick="openTool('word-count')">
+                <span class="tool-icon">&#x1F4CA;</span>
+                <span class="tool-name">Word Counter</span>
+            </button>
+            <button class="tool-card" onclick="openTool('base64')">
+                <span class="tool-icon">&#x1F510;</span>
+                <span class="tool-name">Base64 Code</span>
+            </button>
+            <button class="tool-card" onclick="openTool('password')">
+                <span class="tool-icon">&#x1F511;</span>
+                <span class="tool-name">Password Gen</span>
+            </button>
+            <button class="tool-card" onclick="openTool('qr-code')">
+                <span class="tool-icon">&#x1F4F1;</span>
+                <span class="tool-name">QR Code</span>
+            </button>
+            <button class="tool-card" onclick="openTool('json-formatter')">
+                <span class="tool-icon">&#x1F4CB;</span>
+                <span class="tool-name">JSON Format</span>
+            </button>
+            <button class="tool-card" onclick="openTool('color-picker')">
+                <span class="tool-icon">&#x1F3A8;</span>
+                <span class="tool-name">Color Picker</span>
+            </button>
+            <button class="tool-card" onclick="openTool('lorem')">
+                <span class="tool-icon">&#x1F4C4;</span>
+                <span class="tool-name">Lorem Ipsum</span>
+            </button>
+        </nav>
+
+        <!-- Tool Modal -->
+        <div id="tool-modal" class="modal hidden">
+            <div class="modal-content">
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+                <h2 id="modal-title"></h2>
+                <div id="modal-body"></div>
+                <div id="modal-result" class="result-box hidden"></div>
+            </div>
+        </div>
+
+        <!-- Ad Banner -->
+        <div id="ad-banner" class="ad-banner hidden">
+            <div class="ad-content" id="ad-content"></div>
+            <button class="ad-close" onclick="closeAd()">&#x2715;</button>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
