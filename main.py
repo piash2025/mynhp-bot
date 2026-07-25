@@ -1,4 +1,3 @@
-import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
@@ -10,11 +9,29 @@ from database import (
     add_or_update_user,
     get_user_count,
     get_user,
+    get_all_users,
     increment_tool_use,
     init_db,
     update_balance,
+    get_ad_rate,
+    get_all_ad_rates,
+    update_ad_rate,
+    get_all_admin_settings,
+    set_admin_setting,
+    get_admin_setting,
+    get_total_earnings,
+    get_referral_count,
 )
 from ads_integration import get_ad
+
+
+def check_admin(password: str) -> bool:
+    stored = get_admin_setting.__wrapped__ if hasattr(get_admin_setting, '__wrapped__') else None
+    import sqlite3
+    conn = sqlite3.connect("bot_users.db")
+    row = conn.execute("SELECT value FROM admin_settings WHERE key='admin_password'").fetchone()
+    conn.close()
+    return row and row[0] == password
 
 
 @asynccontextmanager
@@ -23,7 +40,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Telegram Tools Bot", lifespan=lifespan)
+app = FastAPI(title="mynhp_bot", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
@@ -32,6 +49,14 @@ async def root():
     with open("static/index.html", "r") as f:
         return HTMLResponse(content=f.read())
 
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_panel():
+    with open("static/admin.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+
+# ===== USER API =====
 
 @app.post("/api/user/track")
 async def track_user(request: Request):
@@ -87,7 +112,118 @@ async def update_user_balance(request: Request):
     return {"status": "error", "message": "user_id and reward required"}
 
 
+@app.get("/api/user/{user_id}")
+async def get_user_info(user_id: int):
+    user = await get_user(user_id)
+    if user:
+        return user
+    return {"error": "User not found"}
+
+
+@app.get("/api/ad-rate/{network}")
+async def get_network_rate(network: str):
+    rate = await get_ad_rate(network)
+    if rate:
+        return rate
+    return {"error": "Network not found"}
+
+
+# ===== ADMIN API =====
+
+@app.post("/api/admin/login")
+async def admin_login(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if stored and stored == password:
+        return {"status": "ok"}
+    return {"status": "error", "message": "Wrong password"}
+
+
+@app.get("/api/admin/stats")
+async def admin_stats(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    total_users = await get_user_count()
+    total_earnings = await get_total_earnings()
+
+    import sqlite3
+    conn = sqlite3.connect("bot_users.db")
+    row = conn.execute("SELECT COALESCE(SUM(total_referrals), 0) FROM users").fetchone()
+    conn.close()
+    total_referrals = row[0] if row else 0
+
+    return {
+        "total_users": total_users,
+        "total_earnings": total_earnings,
+        "total_referrals": total_referrals,
+    }
+
+
+@app.get("/api/admin/rates")
+async def admin_rates(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    return await get_all_ad_rates()
+
+
+@app.post("/api/admin/rates/{network}")
+async def admin_update_rate(network: str, request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    await update_ad_rate(
+        network,
+        rate=data.get("rate"),
+        daily_limit=data.get("daily_limit"),
+        enabled=data.get("enabled"),
+    )
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/settings")
+async def admin_get_settings(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    return await get_all_admin_settings()
+
+
+@app.post("/api/admin/settings")
+async def admin_update_settings(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password"]:
+        if key in data and data[key]:
+            await set_admin_setting(key, str(data[key]))
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/users")
+async def admin_users(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    page = int(request.query_params.get("page", 0))
+    users = await get_all_users(page=page, limit=50)
+    return {"users": users}
+
+
 if __name__ == "__main__":
     import uvicorn
-
     uvicorn.run("main:app", host=HOST, port=PORT, reload=True)

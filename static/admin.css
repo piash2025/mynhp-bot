@@ -1,0 +1,106 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #0f172a;
+    --bg2: #1e293b;
+    --bg3: #334155;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --accent: #22c55e;
+    --accent-dark: #16a34a;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --blue: #3b82f6;
+    --border: #334155;
+}
+
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+/* Login */
+.login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+.login-card { background: var(--bg2); border-radius: 16px; padding: 40px; width: 100%; max-width: 380px; text-align: center; border: 1px solid var(--border); }
+.login-card h1 { font-size: 24px; margin-bottom: 4px; }
+.login-card > p { color: var(--text2); margin-bottom: 24px; }
+.login-card input { width: 100%; padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 15px; margin-bottom: 12px; }
+.login-card button { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--accent); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+.login-card button:hover { background: var(--accent-dark); }
+.error { color: var(--danger); margin-top: 8px; font-size: 13px; }
+
+/* Dashboard */
+.dashboard { padding: 20px; max-width: 900px; margin: 0 auto; }
+.admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.admin-header h1 { font-size: 22px; }
+.logout-btn { padding: 8px 16px; background: var(--bg3); color: var(--text2); border: none; border-radius: 8px; cursor: pointer; font-size: 13px; }
+
+/* Stats */
+.stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+.stat-card { background: var(--bg2); border-radius: 12px; padding: 16px; text-align: center; border: 1px solid var(--border); }
+.stat-num { display: block; font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.stat-label { font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Tabs */
+.admin-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--bg2); border-radius: 10px; padding: 4px; border: 1px solid var(--border); overflow-x: auto; }
+.admin-tab { flex: 1; padding: 10px 16px; border: none; border-radius: 8px; background: transparent; color: var(--text2); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+.admin-tab.active { background: var(--accent); color: #fff; }
+.admin-tab:hover:not(.active) { background: var(--bg3); }
+
+/* Panels */
+.admin-panel { display: none; }
+.admin-panel.active { display: block; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.admin-panel h2 { font-size: 18px; margin-bottom: 4px; }
+.panel-desc { color: var(--text2); font-size: 13px; margin-bottom: 16px; }
+
+/* Rate Cards */
+.rate-card { background: var(--bg2); border-radius: 12px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--border); display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 12px; align-items: center; }
+.rate-card .network-name { font-weight: 600; font-size: 15px; }
+.rate-card .network-type { font-size: 12px; color: var(--text2); }
+.rate-card label { font-size: 11px; color: var(--text2); text-transform: uppercase; display: block; margin-bottom: 4px; }
+.rate-card input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
+.rate-card .toggle { position: relative; width: 44px; height: 24px; }
+.rate-card .toggle input { display: none; }
+.rate-card .toggle .slider { position: absolute; inset: 0; background: var(--bg3); border-radius: 12px; cursor: pointer; transition: 0.2s; }
+.rate-card .toggle .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+.rate-card .toggle input:checked + .slider { background: var(--accent); }
+.rate-card .toggle input:checked + .slider::before { transform: translateX(20px); }
+
+/* Settings */
+.settings-grid { display: grid; gap: 12px; margin-bottom: 16px; }
+.setting-item { background: var(--bg2); border-radius: 10px; padding: 14px; border: 1px solid var(--border); }
+.setting-item label { display: block; font-size: 12px; color: var(--text2); text-transform: uppercase; margin-bottom: 6px; }
+.setting-item input { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
+
+.save-btn { width: 100%; padding: 12px; background: var(--accent); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+.save-btn:hover { background: var(--accent-dark); }
+
+/* Table */
+.search-bar { margin-bottom: 12px; }
+.search-bar input { width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg2); color: var(--text); font-size: 14px; }
+.table-wrapper { overflow-x: auto; margin-bottom: 12px; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data-table th { background: var(--bg2); padding: 10px 12px; text-align: left; font-weight: 600; color: var(--text2); text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.data-table tr:hover td { background: var(--bg2); }
+
+.pagination { display: flex; align-items: center; justify-content: center; gap: 16px; }
+.pagination button { padding: 8px 16px; background: var(--bg2); color: var(--text); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px; }
+.pagination button:hover { background: var(--bg3); }
+.pagination span { font-size: 13px; color: var(--text2); }
+
+/* Referral */
+.referral-info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.ref-card { background: var(--bg2); border-radius: 12px; padding: 16px; border: 1px solid var(--border); }
+.ref-card h3 { font-size: 14px; margin-bottom: 10px; }
+.ref-card ul { list-style: none; }
+.ref-card li { font-size: 13px; color: var(--text2); padding: 4px 0; padding-left: 14px; position: relative; }
+.ref-card li::before { content: '>'; position: absolute; left: 0; color: var(--accent); }
+.ref-card code { display: block; background: var(--bg); padding: 8px 12px; border-radius: 6px; font-size: 12px; margin: 8px 0; word-break: break-all; }
+.ref-card p { font-size: 12px; color: var(--text2); }
+
+.hidden { display: none !important; }
+
+@media (max-width: 600px) {
+    .stats-row { grid-template-columns: 1fr; }
+    .rate-card { grid-template-columns: 1fr 1fr; }
+    .referral-info { grid-template-columns: 1fr; }
+}

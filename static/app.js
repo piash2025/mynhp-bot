@@ -34,6 +34,7 @@ if (tg?.initDataUnsafe?.user) {
     });
 
     loadStats();
+    loadUserData();
 }
 
 async function loadStats() {
@@ -42,6 +43,49 @@ async function loadStats() {
         const data = await resp.json();
         document.getElementById('stat-users').textContent = data.total_users || 0;
     } catch (e) { /* ignore */ }
+}
+
+async function loadUserData() {
+    if (!currentUser) return;
+    try {
+        const resp = await fetch('/api/user/' + currentUser.id);
+        const data = await resp.json();
+        if (data.balance !== undefined) {
+            balance = data.balance;
+        }
+        const refCount = data.total_referrals || 0;
+        const refEarned = data.referral_earned || 0;
+
+        document.getElementById('ref-count').textContent = refCount;
+        document.getElementById('ref-earned').textContent = refEarned.toFixed(4);
+        document.getElementById('ref-link').textContent =
+            'https://t.me/' + tg?.initDataUnsafe?.bot?.username + '?start=ref_' + currentUser.id;
+
+        updateUI();
+    } catch (e) { /* ignore */ }
+}
+
+function copyRefLink() {
+    const linkEl = document.getElementById('ref-link');
+    const link = linkEl.textContent;
+    navigator.clipboard.writeText(link).then(() => {
+        const btn = document.querySelector('.copy-link-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.innerHTML = '&#128203; Copy Link'; }, 2000);
+    }).catch(() => {
+        const range = document.createRange();
+        range.selectNode(linkEl);
+        window.getSelection().removeAllRanges();
+        window.getSelection().addRange(range);
+        document.execCommand('copy');
+        window.getSelection().removeAllRanges();
+        const btn = document.querySelector('.copy-link-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.innerHTML = '&#128203; Copy Link'; }, 2000);
+    });
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('medium');
+    }
 }
 
 // ===== TAB NAVIGATION =====

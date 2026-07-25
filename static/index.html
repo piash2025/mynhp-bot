@@ -215,6 +215,66 @@
                     </div>
                 </div>
             </div>
+
+            <!-- REFERRAL PAGE -->
+            <div class="page" id="page-referral">
+                <div class="page-content">
+                    <div class="page-header">
+                        <h1>Referral</h1>
+                        <p>Invite friends, earn rewards</p>
+                    </div>
+
+                    <div class="referral-hero">
+                        <div class="referral-icon">&#128640;</div>
+                        <h2>Earn Together!</h2>
+                        <p>Share your link and both earn USDT</p>
+                    </div>
+
+                    <div class="referral-stats-row">
+                        <div class="ref-stat-card">
+                            <span class="ref-stat-num" id="ref-count">0</span>
+                            <span class="ref-stat-label">Referrals</span>
+                        </div>
+                        <div class="ref-stat-card">
+                            <span class="ref-stat-num" id="ref-earned">0.0000</span>
+                            <span class="ref-stat-label">Earned from Refs</span>
+                        </div>
+                    </div>
+
+                    <div class="referral-link-card">
+                        <h3>Your Referral Link</h3>
+                        <div class="ref-link-box" id="ref-link">Loading...</div>
+                        <button class="copy-link-btn" onclick="copyRefLink()">&#128203; Copy Link</button>
+                    </div>
+
+                    <div class="referral-info-card">
+                        <h3>How it works</h3>
+                        <div class="ref-steps">
+                            <div class="ref-step">
+                                <span class="ref-step-num">1</span>
+                                <div>
+                                    <strong>Share your link</strong>
+                                    <p>Send to friends via Telegram, social media, etc.</p>
+                                </div>
+                            </div>
+                            <div class="ref-step">
+                                <span class="ref-step-num">2</span>
+                                <div>
+                                    <strong>Friend joins</strong>
+                                    <p>They click your link and start the bot</p>
+                                </div>
+                            </div>
+                            <div class="ref-step">
+                                <span class="ref-step-num">3</span>
+                                <div>
+                                    <strong>Both earn rewards</strong>
+                                    <p>You and your friend both get USDT bonus!</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <!-- Bottom Navigation -->
@@ -234,6 +294,10 @@
             <button class="nav-tab" onclick="switchTab('wallet')" data-tab="wallet">
                 <span class="nav-icon">&#128176;</span>
                 <span class="nav-label">Wallet</span>
+            </button>
+            <button class="nav-tab" onclick="switchTab('referral')" data-tab="referral">
+                <span class="nav-icon">&#128640;</span>
+                <span class="nav-label">Referral</span>
             </button>
         </nav>
     </div>

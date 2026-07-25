@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>mynhp_bot - Admin Panel</title>
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+    <div class="admin-app">
+        <!-- Login Screen -->
+        <div id="login-screen" class="login-screen">
+            <div class="login-card">
+                <h1>mynhp_bot</h1>
+                <p>Admin Panel</p>
+                <form id="login-form">
+                    <input type="password" id="admin-password" placeholder="Admin Password" required>
+                    <button type="submit">Login</button>
+                </form>
+                <p id="login-error" class="error hidden">Wrong password!</p>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="admin-dashboard" class="dashboard hidden">
+            <header class="admin-header">
+                <h1>mynhp_bot Admin</h1>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </header>
+
+            <!-- Stats Overview -->
+            <div class="stats-row">
+                <div class="stat-card">
+                    <span class="stat-num" id="total-users">0</span>
+                    <span class="stat-label">Total Users</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-num" id="total-earnings">0.0000</span>
+                    <span class="stat-label">Total Earnings</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-num" id="total-referrals">0</span>
+                    <span class="stat-label">Referrals</span>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <nav class="admin-tabs">
+                <button class="admin-tab active" onclick="switchAdminTab('rates')" data-tab="rates">Ad Rates</button>
+                <button class="admin-tab" onclick="switchAdminTab('settings')" data-tab="settings">Settings</button>
+                <button class="admin-tab" onclick="switchAdminTab('users')" data-tab="users">Users</button>
+                <button class="admin-tab" onclick="switchAdminTab('referrals')" data-tab="referrals">Referrals</button>
+            </nav>
+
+            <!-- Ad Rates Tab -->
+            <div class="admin-panel active" id="panel-rates">
+                <h2>Ad Network Rates</h2>
+                <p class="panel-desc">Set reward rates for each ad network</p>
+                <div id="rates-list"></div>
+                <button class="save-btn" onclick="saveAllRates()">Save All Rates</button>
+            </div>
+
+            <!-- Settings Tab -->
+            <div class="admin-panel" id="panel-settings">
+                <h2>Bot Settings</h2>
+                <div class="settings-grid">
+                    <div class="setting-item">
+                        <label>Referral Reward (USDT)</label>
+                        <input type="number" step="0.0001" id="set-referral-reward" value="0.001">
+                    </div>
+                    <div class="setting-item">
+                        <label>Min Withdraw (USDT)</label>
+                        <input type="number" step="0.01" id="set-min-withdraw" value="0.01">
+                    </div>
+                    <div class="setting-item">
+                        <label>Farm Rate (USDT per cycle)</label>
+                        <input type="number" step="0.001" id="set-farm-rate" value="0.001">
+                    </div>
+                    <div class="setting-item">
+                        <label>Farm Duration (hours)</label>
+                        <input type="number" id="set-farm-duration" value="4">
+                    </div>
+                    <div class="setting-item">
+                        <label>Admin Password</label>
+                        <input type="text" id="set-admin-password" value="">
+                    </div>
+                </div>
+                <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+            </div>
+
+            <!-- Users Tab -->
+            <div class="admin-panel" id="panel-users">
+                <h2>User Management</h2>
+                <div class="search-bar">
+                    <input type="text" id="user-search" placeholder="Search by ID or username..." oninput="searchUsers()">
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Username</th>
+                                <th>Name</th>
+                                <th>Balance</th>
+                                <th>Tasks</th>
+                                <th>Referrals</th>
+                                <th>Joined</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table"></tbody>
+                    </table>
+                </div>
+                <div class="pagination">
+                    <button onclick="loadUsers(currentPage - 1)" id="prev-page">Prev</button>
+                    <span id="page-info">Page 1</span>
+                    <button onclick="loadUsers(currentPage + 1)" id="next-page">Next</button>
+                </div>
+            </div>
+
+            <!-- Referrals Tab -->
+            <div class="admin-panel" id="panel-referrals">
+                <h2>Referral System</h2>
+                <div class="referral-info">
+                    <div class="ref-card">
+                        <h3>How it works</h3>
+                        <ul>
+                            <li>Each user gets a unique referral link</li>
+                            <li>New users join via the link</li>
+                            <li>Both referrer and new user get bonus</li>
+                            <li>Rewards are set in Settings tab</li>
+                        </ul>
+                    </div>
+                    <div class="ref-card">
+                        <h3>Referral Link Format</h3>
+                        <code>https://t.me/mynhp_bot?start=ref_USERID</code>
+                        <p>Users share this link. New users who start with this link get tracked.</p>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Referrer</th>
+                                <th>Referred User</th>
+                                <th>Reward</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="referrals-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/admin.js"></script>
+</body>
+</html>
