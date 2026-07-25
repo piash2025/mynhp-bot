@@ -59,7 +59,7 @@ async function loadUserData() {
         document.getElementById('ref-count').textContent = refCount;
         document.getElementById('ref-earned').textContent = refEarned.toFixed(4);
         document.getElementById('ref-link').textContent =
-            'https://t.me/' + tg?.initDataUnsafe?.bot?.username + '?start=ref_' + currentUser.id;
+            'https://t.me/mynhp_bot?start=ref_' + currentUser.id;
 
         updateUI();
     } catch (e) { /* ignore */ }
