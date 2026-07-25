@@ -1,10 +1,15 @@
 from contextlib import asynccontextmanager
+import hashlib
+import hmac
+import time
+import json
+import urllib.parse
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import HOST, PORT
+from config import BOT_TOKEN, HOST, PORT
 from database import (
     add_or_update_user,
     get_user_count,
@@ -97,6 +102,36 @@ async def check_user_session(user_id: int, session_id: str) -> bool:
     return await verify_session(user_id, session_id)
 
 
+# ===== TELEGRAM INITDATA VERIFICATION =====
+def verify_telegram_initdata(init_data: str) -> dict:
+    """Verify Telegram WebApp initData using HMAC-SHA256. Returns parsed user dict or empty dict."""
+    if not init_data or not BOT_TOKEN:
+        return {}
+    try:
+        parsed = dict(urllib.parse.parse_qsl(init_data))
+        received_hash = parsed.pop("hash", "")
+        if not received_hash:
+            return {}
+        data_check_string = "\n".join(
+            f"{k}={v}" for k, v in sorted(parsed.items())
+        )
+        secret_key = hmac.new(
+            b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256
+        ).digest()
+        computed_hash = hmac.new(
+            secret_key, data_check_string.encode(), hashlib.sha256
+        ).hexdigest()
+        if computed_hash == received_hash:
+            user_str = parsed.get("user", "{}")
+            return json.loads(user_str) if user_str else {}
+        return {}
+    except Exception:
+        return {}
+
+
+# ===== AD TIMING VALIDATION =====
+_ad_start_times = {}  # user_id -> timestamp when ad started
+
 VPN_BLOCKED_RESPONSE = JSONResponse(
     status_code=403,
     content={"vpn_blocked": True, "status": "error", "message": "VPN/Proxy usage is not allowed. Please disable your VPN and try again."}
@@ -132,27 +167,44 @@ async def track_user(request: Request):
     data = await request.json()
     user_id = data.get("user_id")
     session_id = data.get("session_id", "")
-    if user_id:
-        await add_or_update_user(
-            user_id, data.get("username"), data.get("first_name")
-        )
-        if session_id:
-            await update_session_id(user_id, session_id)
-        ip = extract_ip(request)
-        if ip:
-            geo = await get_geo_info(ip)
-            await update_user_ip(user_id, ip, geo["country"], geo["city"], geo["is_vpn"])
-            if geo["is_vpn"]:
-                user = await get_user(user_id)
-                uname = user.get("username", "") if user else ""
-                await log_fraud(user_id, uname, "vpn_detected", f"VPN/Proxy detected from {geo['country']}", ip, "medium")
-        user = await get_user(user_id)
-        if user and user.get("is_banned"):
-            return BANNED_RESPONSE
-        if await check_vpn_blocked(user_id):
-            return VPN_BLOCKED_RESPONSE
-        return {"status": "ok"}
-    return {"status": "error", "message": "user_id required"}
+    init_data = data.get("init_data", "")
+
+    if not user_id:
+        return {"status": "error", "message": "user_id required"}
+
+    # Silent Telegram initData hash verification (no block — just trust the user_id from frontend)
+    if init_data:
+        verified_user = verify_telegram_initdata(init_data)
+        if verified_user and verified_user.get("id"):
+            user_id = verified_user["id"]
+
+    await add_or_update_user(
+        user_id, data.get("username"), data.get("first_name")
+    )
+    if session_id:
+        await update_session_id(user_id, session_id)
+
+    ip = extract_ip(request)
+    is_vpn = False
+    if ip:
+        geo = await get_geo_info(ip)
+        await update_user_ip(user_id, ip, geo["country"], geo["city"], geo["is_vpn"])
+        is_vpn = geo["is_vpn"]
+        if geo["is_vpn"]:
+            user = await get_user(user_id)
+            uname = user.get("username", "") if user else ""
+            await log_fraud(user_id, uname, "vpn_detected", f"VPN/Proxy detected from {geo['country']}", ip, "medium")
+
+    user = await get_user(user_id)
+    if user and user.get("is_banned"):
+        return BANNED_RESPONSE
+
+    # VPN soft warning — return flag instead of hard block
+    vpn_setting = await get_admin_setting("vpn_blocker")
+    if vpn_setting == "1" and is_vpn:
+        return {"status": "ok", "vpn_warning": True, "message": "VPN/Proxy detected. Please disable VPN to continue earning."}
+
+    return {"status": "ok", "vpn_warning": False}
 
 
 @app.post("/api/tool/use")
@@ -165,9 +217,14 @@ async def tool_use(request: Request):
             return SESSION_EXPIRED_RESPONSE
         if await check_user_banned(user_id):
             return BANNED_RESPONSE
-        if await check_vpn_blocked(user_id):
-            return VPN_BLOCKED_RESPONSE
+        # VPN soft warning
+        user = await get_user(user_id)
+        vpn_setting = await get_admin_setting("vpn_blocker")
+        if vpn_setting == "1" and user and user.get("is_vpn"):
+            return {"status": "error", "vpn_warning": True, "message": "VPN detected. Please disable VPN to earn rewards."}
         await increment_tool_use(user_id)
+        # Record ad start time for invisible time validation
+        _ad_start_times[user_id] = time.time()
         return {"status": "ok"}
     return {"status": "error", "message": "user_id required"}
 
@@ -204,12 +261,29 @@ async def update_user_balance(request: Request):
         user = await get_user(user_id)
         if user and user.get("is_banned"):
             return BANNED_RESPONSE
-        if await check_vpn_blocked(user_id):
-            return VPN_BLOCKED_RESPONSE
+
+        # Invisible time validation — block cheaters who skip ad wait
+        min_ad_seconds = 4
+        start_time = _ad_start_times.get(user_id)
+        if start_time:
+            elapsed = time.time() - start_time
+            if elapsed < min_ad_seconds:
+                _ad_start_times.pop(user_id, None)
+                return {"status": "error", "message": "Too fast. Please wait for the ad to finish.", "time_reject": True}
+            _ad_start_times.pop(user_id, None)
+
+        # VPN soft warning
         ip = extract_ip(request)
+        is_vpn = False
         if ip:
             geo = await get_geo_info(ip)
             await update_user_ip(user_id, ip, geo["country"], geo["city"], geo["is_vpn"])
+            is_vpn = geo["is_vpn"]
+
+        vpn_setting = await get_admin_setting("vpn_blocker")
+        if vpn_setting == "1" and is_vpn:
+            return {"status": "error", "vpn_warning": True, "message": "VPN detected. Please disable VPN to earn rewards."}
+
         await update_balance(user_id, reward)
         await check_referral_release(user_id)
         user = await get_user(user_id)

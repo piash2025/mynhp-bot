@@ -756,6 +756,45 @@ body {
     color: #64748b !important;
 }
 
+/* ===== VPN WARNING BANNER ===== */
+.vpn-warning-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 999998;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    padding: 12px 16px;
+    animation: slideDownBanner 0.3s ease;
+}
+@keyframes slideDownBanner { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+.vpn-warning-inner {
+    max-width: 600px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+}
+.vpn-warning-icon { font-size: 20px; flex-shrink: 0; }
+.vpn-warning-text { font-size: 13px; font-weight: 600; flex: 1; }
+.vpn-warning-close {
+    background: rgba(255,255,255,0.2);
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+.vpn-warning-close:hover { background: rgba(255,255,255,0.35); }
+
 /* ===== SESSION EXPIRED TOAST ===== */
 .session-toast {
     position: fixed;

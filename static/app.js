@@ -49,14 +49,17 @@ function showBannedScreen() {
     document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
 }
 
-function showVPNBlockedScreen() {
-    var overlay = document.getElementById('vpn-blocked-overlay');
-    if (overlay) {
-        overlay.classList.remove('hidden');
-        document.querySelector('.bottom-nav')?.classList.add('hidden');
-        document.querySelector('.header')?.classList.add('hidden');
-        document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+function showVPNWarning(message) {
+    var banner = document.getElementById('vpn-warning-banner');
+    if (banner) {
+        banner.classList.remove('hidden');
+        banner.querySelector('.vpn-warning-text').textContent = message || 'VPN/Proxy detected. Please disable VPN to continue earning.';
     }
+}
+
+function hideVPNWarning() {
+    var banner = document.getElementById('vpn-warning-banner');
+    if (banner) banner.classList.add('hidden');
 }
 
 const _originalFetch = window.fetch;
@@ -80,7 +83,6 @@ window.fetch = function(url, opts) {
         if (resp.status === 403) {
             resp.clone().json().then(function(data) {
                 if (data.banned) showBannedScreen();
-                if (data.vpn_blocked) showVPNBlockedScreen();
             }).catch(function() {});
         }
         if (resp.status === 401) {
@@ -118,6 +120,7 @@ if (tg?.initDataUnsafe?.user) {
     document.getElementById('username').textContent = currentUser.first_name || 'User';
     document.getElementById('user-id').textContent = '@' + (currentUser.username || 'user');
 
+    // Silent Telegram initData verification + IP/GeoIP logging
     fetch('/api/user/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -126,14 +129,19 @@ if (tg?.initDataUnsafe?.user) {
             username: currentUser.username,
             first_name: currentUser.first_name,
             session_id: userSessionId,
+            init_data: tg.initData || '',
         }),
     }).then(function(resp) {
-        if (resp.status === 403) {
-            resp.json().then(function(data) {
-                if (data.banned) showBannedScreen();
-            });
+        return resp.json();
+    }).then(function(data) {
+        if (data.banned) {
+            showBannedScreen();
+        } else if (data.vpn_warning) {
+            showVPNWarning(data.message);
+        } else {
+            hideVPNWarning();
         }
-    });
+    }).catch(function() {});
 
     loadConfig();
     loadStats();
@@ -325,7 +333,19 @@ function watchAd(network) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: currentUser?.id, network: network }),
-    });
+    }).then(function(resp) {
+        return resp.json();
+    }).then(function(data) {
+        if (data.banned) {
+            showBannedScreen();
+            document.getElementById('ad-modal').classList.add('hidden');
+            clearInterval(adTimerInterval);
+        } else if (data.vpn_warning) {
+            showVPNWarning(data.message);
+            document.getElementById('ad-modal').classList.add('hidden');
+            clearInterval(adTimerInterval);
+        }
+    }).catch(function() {});
 }
 
 function claimReward() {
@@ -353,12 +373,27 @@ function claimReward() {
             reward: reward,
         }),
     }).then(function(resp) {
-        if (resp.status === 403) {
-            resp.json().then(function(data) {
-                if (data.banned) showBannedScreen();
-            });
+        return resp.json();
+    }).then(function(data) {
+        if (data.banned) {
+            showBannedScreen();
+        } else if (data.vpn_warning) {
+            showVPNWarning(data.message);
+        } else if (data.time_reject) {
+            // Silently reject — user tried to skip ad timer
+            balance -= reward;
+            totalEarned -= reward;
+            tasksDone--;
+            todayEarned -= reward;
+            updateUI();
+        } else if (data.status === 'ok') {
+            hideVPNWarning();
+            if (data.balance !== undefined) balance = data.balance;
+            if (data.total_earned !== undefined) totalEarned = data.total_earned;
+            if (data.tasks_done !== undefined) tasksDone = data.tasks_done;
+            updateUI();
         }
-    });
+    }).catch(function() {});
 }
 
 function updateUI() {
