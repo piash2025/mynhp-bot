@@ -69,9 +69,9 @@ function copyRefLink() {
     const linkEl = document.getElementById('ref-link');
     const link = linkEl.textContent;
     navigator.clipboard.writeText(link).then(() => {
-        const btn = document.querySelector('.copy-link-btn');
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.innerHTML = '&#128203; Copy Link'; }, 2000);
+        const btn = document.querySelector('.ref-copy-btn');
+        btn.innerHTML = '<span>&#10003;</span> Copied!';
+        setTimeout(() => { btn.innerHTML = '<span>&#128203;</span> Copy Link'; }, 2000);
     }).catch(() => {
         const range = document.createRange();
         range.selectNode(linkEl);
@@ -79,12 +79,28 @@ function copyRefLink() {
         window.getSelection().addRange(range);
         document.execCommand('copy');
         window.getSelection().removeAllRanges();
-        const btn = document.querySelector('.copy-link-btn');
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.innerHTML = '&#128203; Copy Link'; }, 2000);
+        const btn = document.querySelector('.ref-copy-btn');
+        btn.innerHTML = '<span>&#10003;</span> Copied!';
+        setTimeout(() => { btn.innerHTML = '<span>&#128203;</span> Copy Link'; }, 2000);
     });
     if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('medium');
+    }
+}
+
+function shareRefLink() {
+    const link = document.getElementById('ref-link').textContent;
+    if (tg?.shareURL) {
+        tg.shareURL(link, 'Join me on mynhp_bot and earn USDT! 🚀');
+    } else {
+        navigator.share?.({
+            title: 'mynhp_bot Referral',
+            text: 'Join me on mynhp_bot and earn USDT!',
+            url: link,
+        }).catch(() => {});
+    }
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('light');
     }
 }
 

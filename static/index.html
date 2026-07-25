@@ -219,56 +219,85 @@
             <!-- REFERRAL PAGE -->
             <div class="page" id="page-referral">
                 <div class="page-content">
-                    <div class="page-header">
-                        <h1>Referral</h1>
-                        <p>Invite friends, earn rewards</p>
-                    </div>
-
-                    <div class="referral-hero">
-                        <div class="referral-icon">&#128640;</div>
-                        <h2>Earn Together!</h2>
-                        <p>Share your link and both earn USDT</p>
-                    </div>
-
-                    <div class="referral-stats-row">
-                        <div class="ref-stat-card">
-                            <span class="ref-stat-num" id="ref-count">0</span>
-                            <span class="ref-stat-label">Referrals</span>
-                        </div>
-                        <div class="ref-stat-card">
-                            <span class="ref-stat-num" id="ref-earned">0.0000</span>
-                            <span class="ref-stat-label">Earned from Refs</span>
+                    <div class="ref-hero">
+                        <div class="ref-hero-bg"></div>
+                        <div class="ref-hero-content">
+                            <div class="ref-emoji-wrap">
+                                <span class="ref-emoji">&#128640;</span>
+                            </div>
+                            <h1 class="ref-title">Invite & Earn</h1>
+                            <p class="ref-sub">Share your link. Both earn USDT!</p>
                         </div>
                     </div>
 
-                    <div class="referral-link-card">
-                        <h3>Your Referral Link</h3>
-                        <div class="ref-link-box" id="ref-link">Loading...</div>
-                        <button class="copy-link-btn" onclick="copyRefLink()">&#128203; Copy Link</button>
+                    <div class="ref-stats-grid">
+                        <div class="ref-stat-box">
+                            <div class="ref-stat-icon">&#128101;</div>
+                            <div class="ref-stat-val" id="ref-count">0</div>
+                            <div class="ref-stat-txt">Total Referrals</div>
+                        </div>
+                        <div class="ref-stat-box">
+                            <div class="ref-stat-icon">&#128176;</div>
+                            <div class="ref-stat-val" id="ref-earned">0.0000</div>
+                            <div class="ref-stat-txt">Earned (USDT)</div>
+                        </div>
                     </div>
 
-                    <div class="referral-info-card">
-                        <h3>How it works</h3>
-                        <div class="ref-steps">
-                            <div class="ref-step">
-                                <span class="ref-step-num">1</span>
-                                <div>
-                                    <strong>Share your link</strong>
-                                    <p>Send to friends via Telegram, social media, etc.</p>
+                    <div class="ref-link-section">
+                        <div class="ref-link-label">Your unique referral link</div>
+                        <div class="ref-link-container">
+                            <div class="ref-link-text" id="ref-link">Loading...</div>
+                        </div>
+                        <div class="ref-btn-row">
+                            <button class="ref-copy-btn" onclick="copyRefLink()">
+                                <span>&#128203;</span> Copy Link
+                            </button>
+                            <button class="ref-share-btn" onclick="shareRefLink()">
+                                <span>&#128228;</span> Share
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="ref-reward-banner">
+                        <div class="ref-reward-left">
+                            <span class="ref-reward-emoji">&#127873;</span>
+                            <div>
+                                <div class="ref-reward-title">Referral Bonus</div>
+                                <div class="ref-reward-desc">Per successful invite</div>
+                            </div>
+                        </div>
+                        <div class="ref-reward-amount" id="ref-reward-amount">0.001 USDT</div>
+                    </div>
+
+                    <div class="ref-how-section">
+                        <h3 class="ref-how-title">How it works</h3>
+                        <div class="ref-how-list">
+                            <div class="ref-how-item">
+                                <div class="ref-how-num">1</div>
+                                <div class="ref-how-body">
+                                    <strong>Copy your link</strong>
+                                    <p>Tap the copy button above to get your referral link</p>
                                 </div>
                             </div>
-                            <div class="ref-step">
-                                <span class="ref-step-num">2</span>
-                                <div>
-                                    <strong>Friend joins</strong>
-                                    <p>They click your link and start the bot</p>
+                            <div class="ref-how-item">
+                                <div class="ref-how-num">2</div>
+                                <div class="ref-how-body">
+                                    <strong>Share with friends</strong>
+                                    <p>Send it on Telegram, WhatsApp, social media, anywhere!</p>
                                 </div>
                             </div>
-                            <div class="ref-step">
-                                <span class="ref-step-num">3</span>
-                                <div>
-                                    <strong>Both earn rewards</strong>
-                                    <p>You and your friend both get USDT bonus!</p>
+                            <div class="ref-how-item">
+                                <div class="ref-how-num">3</div>
+                                <div class="ref-how-body">
+                                    <strong>They join the bot</strong>
+                                    <p>Friends click the link and start the bot</p>
+                                </div>
+                            </div>
+                            <div class="ref-how-item">
+                                <div class="ref-how-num">&#10003;</div>
+                                <div class="ref-how-body">
+                                    <strong>You both earn!</strong>
+                                    <p>Instant USDT reward for you and your friend</p>
                                 </div>
                             </div>
                         </div>
