@@ -55,6 +55,13 @@ async function loadConfig() {
     } catch (e) { /* ignore */ }
 }
 
+function formatUSDT(amount) {
+    if (amount === 0) return '0.00';
+    if (amount < 0.0001) return amount.toFixed(6);
+    if (amount < 0.01) return amount.toFixed(5);
+    return amount.toFixed(4);
+}
+
 function updateAdCardsUI() {
     const networks = ['adsgream', 'monetag', 'adexium', 'bonus'];
     networks.forEach(function(net) {
@@ -64,7 +71,7 @@ function updateAdCardsUI() {
         const limitEl = document.getElementById('limit-' + net);
         const cardEl = document.getElementById('task-' + net);
         if (rewardEl) {
-            rewardEl.textContent = '+' + rateData.rate.toFixed(4) + ' USDT';
+            rewardEl.textContent = '+' + formatUSDT(rateData.rate) + ' USDT';
         }
         if (limitEl) {
             limitEl.textContent = 'Daily limit: ' + rateData.daily_limit + '/' + rateData.daily_limit;
@@ -73,7 +80,7 @@ function updateAdCardsUI() {
             cardEl.style.display = rateData.enabled ? '' : 'none';
         }
     });
-    document.getElementById('farm-rate-text').textContent = appConfig.farm_rate.toFixed(4);
+    document.getElementById('farm-rate-text').textContent = formatUSDT(appConfig.farm_rate);
     document.getElementById('farm-duration-text').textContent = appConfig.farm_duration_hours;
 }
 
@@ -97,7 +104,7 @@ async function loadUserData() {
         const refEarned = data.referral_earned || 0;
 
         document.getElementById('ref-count').textContent = refCount;
-        document.getElementById('ref-earned').textContent = refEarned.toFixed(4);
+        document.getElementById('ref-earned').textContent = formatUSDT(refEarned);
         document.getElementById('ref-link').textContent =
             'https://t.me/mynhp_bot?start=ref_' + currentUser.id;
 
@@ -242,12 +249,12 @@ function claimReward() {
 }
 
 function updateUI() {
-    document.getElementById('balance').textContent = balance.toFixed(4);
+    document.getElementById('balance').textContent = formatUSDT(balance);
     document.getElementById('stat-tasks').textContent = tasksDone;
-    document.getElementById('stat-earned').textContent = totalEarned.toFixed(4);
-    document.getElementById('stat-today').textContent = todayEarned.toFixed(4);
-    document.getElementById('wallet-balance').textContent = balance.toFixed(4);
-    document.getElementById('farm-amount').textContent = farmBalance.toFixed(4) + ' USDT';
+    document.getElementById('stat-earned').textContent = formatUSDT(totalEarned);
+    document.getElementById('stat-today').textContent = formatUSDT(todayEarned);
+    document.getElementById('wallet-balance').textContent = formatUSDT(balance);
+    document.getElementById('farm-amount').textContent = formatUSDT(farmBalance) + ' USDT';
 }
 
 // ===== FARMING =====
