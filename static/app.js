@@ -41,12 +41,22 @@ function forceLogout() {
     setTimeout(function() { location.reload(); }, 1500);
 }
 
-// ===== BAN INTERCEPTOR =====
+// ===== BAN / VPN BLOCK INTERCEPTOR =====
 function showBannedScreen() {
     document.getElementById('banned-overlay')?.classList.remove('hidden');
     document.querySelector('.bottom-nav')?.classList.add('hidden');
     document.querySelector('.header')?.classList.add('hidden');
     document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+}
+
+function showVPNBlockedScreen() {
+    var overlay = document.getElementById('vpn-blocked-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        document.querySelector('.bottom-nav')?.classList.add('hidden');
+        document.querySelector('.header')?.classList.add('hidden');
+        document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+    }
 }
 
 const _originalFetch = window.fetch;
@@ -70,6 +80,7 @@ window.fetch = function(url, opts) {
         if (resp.status === 403) {
             resp.clone().json().then(function(data) {
                 if (data.banned) showBannedScreen();
+                if (data.vpn_blocked) showVPNBlockedScreen();
             }).catch(function() {});
         }
         if (resp.status === 401) {

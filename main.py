@@ -97,6 +97,22 @@ async def check_user_session(user_id: int, session_id: str) -> bool:
     return await verify_session(user_id, session_id)
 
 
+VPN_BLOCKED_RESPONSE = JSONResponse(
+    status_code=403,
+    content={"vpn_blocked": True, "status": "error", "message": "VPN/Proxy usage is not allowed. Please disable your VPN and try again."}
+)
+
+
+async def check_vpn_blocked(user_id: int) -> bool:
+    vpn_setting = await get_admin_setting("vpn_blocker")
+    if vpn_setting != "1":
+        return False
+    user = await get_user(user_id)
+    if user and user.get("is_vpn"):
+        return True
+    return False
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     with open("static/index.html", "r") as f:
@@ -133,6 +149,8 @@ async def track_user(request: Request):
         user = await get_user(user_id)
         if user and user.get("is_banned"):
             return BANNED_RESPONSE
+        if await check_vpn_blocked(user_id):
+            return VPN_BLOCKED_RESPONSE
         return {"status": "ok"}
     return {"status": "error", "message": "user_id required"}
 
@@ -147,6 +165,8 @@ async def tool_use(request: Request):
             return SESSION_EXPIRED_RESPONSE
         if await check_user_banned(user_id):
             return BANNED_RESPONSE
+        if await check_vpn_blocked(user_id):
+            return VPN_BLOCKED_RESPONSE
         await increment_tool_use(user_id)
         return {"status": "ok"}
     return {"status": "error", "message": "user_id required"}
@@ -164,6 +184,8 @@ async def get_ad_for_user(user_id: int, language: str = "en", session_id: str = 
         return SESSION_EXPIRED_RESPONSE
     if await check_user_banned(user_id):
         return BANNED_RESPONSE
+    if await check_vpn_blocked(user_id):
+        return VPN_BLOCKED_RESPONSE
     ad = await get_ad(user_id, language)
     if ad:
         return ad
@@ -182,6 +204,8 @@ async def update_user_balance(request: Request):
         user = await get_user(user_id)
         if user and user.get("is_banned"):
             return BANNED_RESPONSE
+        if await check_vpn_blocked(user_id):
+            return VPN_BLOCKED_RESPONSE
         ip = extract_ip(request)
         if ip:
             geo = await get_geo_info(ip)
