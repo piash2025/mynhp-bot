@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import threading
 
 import uvicorn
 from dotenv import load_dotenv
@@ -17,9 +16,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+bot_application = None
 
-def run_bot():
-    import asyncio
+
+async def run_bot():
+    global bot_application
     from telegram.ext import Application
     from bot import setup_handlers
 
@@ -27,31 +28,32 @@ def run_bot():
         logger.error("BOT_TOKEN not set!")
         return
 
-    asyncio.set_event_loop(asyncio.new_event_loop())
+    bot_application = Application.builder().token(BOT_TOKEN).build()
+    setup_handlers(bot_application)
 
-    application = Application.builder().token(BOT_TOKEN).build()
-    setup_handlers(application)
-
+    await bot_application.initialize()
+    await bot_application.start()
+    await bot_application.updater.start_polling(drop_pending_updates=True)
     logger.info("Bot started polling...")
-
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(application.initialize())
-    loop.run_until_complete(application.start())
-    loop.run_until_complete(application.updater.start_polling(drop_pending_updates=True))
-    loop.run_forever()
 
 
 async def main():
     await init_db()
     logger.info("Database initialized.")
 
+    bot_task = asyncio.create_task(run_bot())
+
+    config = uvicorn.Config(
+        app,
+        host=HOST,
+        port=PORT,
+        log_level="info",
+    )
+    server = uvicorn.Server(config)
+
+    logger.info(f"Starting FastAPI server on {HOST}:{PORT}")
+    await server.serve()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    logger.info("Bot thread started.")
-
-    logger.info(f"Starting FastAPI server on {HOST}:{PORT}")
-    uvicorn.run(app, host=HOST, port=PORT)
