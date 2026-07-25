@@ -107,12 +107,52 @@ async function loadStats() {
     } catch (e) { /* ignore */ }
 }
 
+// ===== SIDEBAR TOGGLE =====
+var sidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+document.addEventListener('DOMContentLoaded', function() {
+    var sb = document.getElementById('admin-sidebar');
+    if (sb && sidebarCollapsed) sb.classList.add('collapsed');
+});
+
+function toggleSidebar() {
+    var sb = document.getElementById('admin-sidebar');
+    var ov = document.querySelector('.sidebar-overlay');
+    var isMobile = window.innerWidth <= 768;
+    if (isMobile) {
+        sb.classList.toggle('mobile-open');
+        ov.classList.toggle('active');
+    } else {
+        sb.classList.toggle('collapsed');
+        sidebarCollapsed = sb.classList.contains('collapsed');
+        localStorage.setItem('sidebar_collapsed', sidebarCollapsed);
+    }
+}
+
 // ===== TABS =====
+var tabTitles = {
+    dashboard: 'Analytics Dashboard',
+    platforms: 'Ad Platform Manager',
+    rates: 'Ad Network Rates',
+    withdrawals: 'Withdrawal Management',
+    fraud: 'Fraud Detection & Anti-Cheat',
+    settings: 'Bot Settings',
+    users: 'User Management',
+    referrals: 'Referral System'
+};
+
 function switchAdminTab(tab) {
     document.querySelectorAll('.admin-panel').forEach(function(p) { p.classList.remove('active'); });
-    document.querySelectorAll('.admin-tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.sidebar-item').forEach(function(t) { t.classList.remove('active'); });
     document.getElementById('panel-' + tab).classList.add('active');
-    document.querySelector('[data-tab="' + tab + '"]').classList.add('active');
+    document.querySelector('.sidebar-item[data-tab="' + tab + '"]').classList.add('active');
+    var ht = document.getElementById('header-title');
+    if (ht) ht.textContent = tabTitles[tab] || tab;
+    var sb = document.getElementById('admin-sidebar');
+    var ov = document.querySelector('.sidebar-overlay');
+    if (window.innerWidth <= 768 && sb.classList.contains('mobile-open')) {
+        sb.classList.remove('mobile-open');
+        ov.classList.remove('active');
+    }
 }
 
 // ===== AD RATES =====

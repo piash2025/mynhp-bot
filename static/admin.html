@@ -33,469 +33,521 @@
         </div>
 
         <!-- Admin Dashboard -->
-        <div id="admin-dashboard" class="dashboard hidden">
-            <header class="admin-header">
-                <h1>&#9881; mynhp_bot Admin</h1>
-                <div class="header-actions">
-                    <button class="quick-add-btn" onclick="openPlatformModal()">&#10010; Add Platform</button>
-                    <button class="logout-btn" onclick="logout()">&#10140; Logout</button>
-                </div>
-            </header>
+        <div id="admin-dashboard" class="admin-layout hidden">
+            <!-- Sidebar Overlay (mobile) -->
+            <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-            <!-- Stats Overview -->
-            <div class="stats-row">
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon users-icon">&#128101;</span>
-                        <span class="stat-trend up">&#9650; Live</span>
+            <!-- Sidebar -->
+            <aside class="admin-sidebar" id="admin-sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-brand">
+                        <span class="sidebar-brand-icon">&#128737;</span>
+                        <span class="sidebar-brand-text">mynhp_bot</span>
                     </div>
-                    <span class="stat-num" id="total-users">0</span>
-                    <span class="stat-label">Total Users</span>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon earnings-icon">&#128176;</span>
-                        <span class="stat-trend up">&#9650; USDT</span>
-                    </div>
-                    <span class="stat-num" id="total-earnings">0.0000</span>
-                    <span class="stat-label">Total Earnings</span>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon referrals-icon">&#128640;</span>
-                        <span class="stat-trend up">&#9650; Active</span>
-                    </div>
-                    <span class="stat-num" id="total-referrals">0</span>
-                    <span class="stat-label">Referrals</span>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon withdraw-icon">&#128179;</span>
-                        <span class="stat-trend warn" id="pending-withdraw-trend">&#9679; Pending</span>
-                    </div>
-                    <span class="stat-num" id="pending-withdrawals">0</span>
-                    <span class="stat-label">Pending Payouts</span>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card-header">
-                        <span class="stat-icon fraud-icon">&#128680;</span>
-                        <span class="stat-trend danger" id="fraud-trend">&#9679; Alerts</span>
-                    </div>
-                    <span class="stat-num" id="fraud-alerts">0</span>
-                    <span class="stat-label">Fraud Alerts</span>
-                </div>
-            </div>
-
-            <!-- Tab Navigation -->
-            <nav class="admin-tabs">
-                <button class="admin-tab active" onclick="switchAdminTab('dashboard')" data-tab="dashboard">&#128202; Dashboard</button>
-                <button class="admin-tab" onclick="switchAdminTab('platforms')" data-tab="platforms">&#128225; Platforms</button>
-                <button class="admin-tab" onclick="switchAdminTab('rates')" data-tab="rates">&#128200; Ad Rates</button>
-                <button class="admin-tab" onclick="switchAdminTab('withdrawals')" data-tab="withdrawals">&#128179; Withdrawals</button>
-                <button class="admin-tab" onclick="switchAdminTab('fraud')" data-tab="fraud">&#128680; Fraud</button>
-                <button class="admin-tab" onclick="switchAdminTab('settings')" data-tab="settings">&#9881; Settings</button>
-                <button class="admin-tab" onclick="switchAdminTab('users')" data-tab="users">&#128101; Users</button>
-                <button class="admin-tab" onclick="switchAdminTab('referrals')" data-tab="referrals">&#128640; Referrals</button>
-            </nav>
-
-            <!-- Dashboard Tab (DEFAULT) -->
-            <div class="admin-panel active" id="panel-dashboard">
-                <h2>&#128202; Analytics Dashboard</h2>
-                <p class="panel-desc">Platform overview and performance metrics</p>
-
-                <div class="dash-summary">
-                    <div class="dash-card">
-                        <span class="dash-card-icon users-icon">&#128101;</span>
-                        <span class="dash-card-val" id="d-total-users">0</span>
-                        <span class="dash-card-label">Total Users</span>
-                    </div>
-                    <div class="dash-card">
-                        <span class="dash-card-icon today-icon">&#128200;</span>
-                        <span class="dash-card-val" id="d-new-today">0</span>
-                        <span class="dash-card-label">New Today</span>
-                    </div>
-                    <div class="dash-card">
-                        <span class="dash-card-icon earnings-icon">&#128176;</span>
-                        <span class="dash-card-val" id="d-total-earnings">0</span>
-                        <span class="dash-card-label">Total Earnings</span>
-                    </div>
-                    <div class="dash-card">
-                        <span class="dash-card-icon platform-icon">&#128225;</span>
-                        <span class="dash-card-val" id="d-total-platforms">0</span>
-                        <span class="dash-card-label">Platforms</span>
-                    </div>
-                    <div class="dash-card">
-                        <span class="dash-card-icon payout-icon">&#128179;</span>
-                        <span class="dash-card-val" id="d-total-payouts">0</span>
-                        <span class="dash-card-label">Total Payouts</span>
-                    </div>
-                    <div class="dash-card">
-                        <span class="dash-card-icon pending-icon">&#9203;</span>
-                        <span class="dash-card-val" id="d-pending-count">0</span>
-                        <span class="dash-card-label">Pending Payouts</span>
-                    </div>
+                    <button class="sidebar-toggle" onclick="toggleSidebar()" title="Toggle sidebar">&#9776;</button>
                 </div>
 
-                <div class="chart-row">
-                    <div class="chart-box">
-                        <h3>&#128200; User Growth (Last 30 Days)</h3>
-                        <canvas id="chart-users"></canvas>
-                    </div>
-                    <div class="chart-box">
-                        <h3>&#128202; Daily Impressions</h3>
-                        <canvas id="chart-impressions"></canvas>
-                    </div>
+                <nav class="sidebar-nav">
+                    <a class="sidebar-item active" data-tab="dashboard" onclick="switchAdminTab('dashboard')">
+                        <span class="sidebar-icon">&#128202;</span>
+                        <span class="sidebar-label">Dashboard</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="platforms" onclick="switchAdminTab('platforms')">
+                        <span class="sidebar-icon">&#128225;</span>
+                        <span class="sidebar-label">Platforms</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="rates" onclick="switchAdminTab('rates')">
+                        <span class="sidebar-icon">&#128200;</span>
+                        <span class="sidebar-label">Ad Rates</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="withdrawals" onclick="switchAdminTab('withdrawals')">
+                        <span class="sidebar-icon">&#128179;</span>
+                        <span class="sidebar-label">Withdrawals</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="fraud" onclick="switchAdminTab('fraud')">
+                        <span class="sidebar-icon">&#128680;</span>
+                        <span class="sidebar-label">Fraud</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="settings" onclick="switchAdminTab('settings')">
+                        <span class="sidebar-icon">&#9881;</span>
+                        <span class="sidebar-label">Settings</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="users" onclick="switchAdminTab('users')">
+                        <span class="sidebar-icon">&#128101;</span>
+                        <span class="sidebar-label">Users</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="referrals" onclick="switchAdminTab('referrals')">
+                        <span class="sidebar-icon">&#128640;</span>
+                        <span class="sidebar-label">Referrals</span>
+                    </a>
+                </nav>
+
+                <div class="sidebar-footer">
+                    <button class="sidebar-logout" onclick="logout()">
+                        <span class="sidebar-icon">&#10140;</span>
+                        <span class="sidebar-label">Logout</span>
+                    </button>
                 </div>
-                <div class="chart-row">
-                    <div class="chart-box">
-                        <h3>&#128176; Payout Trends</h3>
-                        <canvas id="chart-payouts"></canvas>
+            </aside>
+
+            <!-- Main Content -->
+            <div class="admin-main">
+                <!-- Top Header -->
+                <header class="admin-header">
+                    <div class="header-left">
+                        <span class="header-title" id="header-title">Analytics Dashboard</span>
                     </div>
-                    <div class="chart-box">
-                        <h3>&#128225; Ad Views by Platform</h3>
-                        <canvas id="chart-platforms"></canvas>
+                    <div class="header-actions">
+                        <button class="quick-add-btn" onclick="openPlatformModal()">&#10010; Add Platform</button>
                     </div>
-                </div>
-            </div>
+                </header>
 
-            <!-- Ads Platforms Tab -->
-            <div class="admin-panel" id="panel-platforms">
-                <h2>&#128225; Ad Platform Manager</h2>
-                <p class="panel-desc">Add, edit, or remove ad platforms</p>
-
-                <div class="platform-header">
-                    <button class="save-btn" style="max-width:240px" onclick="openPlatformModal()">&#10010; Add New Platform</button>
-                </div>
-
-                <div id="platforms-list"></div>
-            </div>
-
-            <!-- Ad Rates Tab -->
-            <div class="admin-panel" id="panel-rates">
-                <h2>&#128200; Ad Network Rates</h2>
-                <p class="panel-desc">Set reward rates for each ad network</p>
-                <div id="rates-list"></div>
-                <button class="save-btn" onclick="saveAllRates()">&#128190; Save All Rates</button>
-            </div>
-
-            <!-- Withdrawals Tab -->
-            <div class="admin-panel" id="panel-withdrawals">
-                <h2>&#128179; Withdrawal Management</h2>
-                <p class="panel-desc">Review and process user payout requests</p>
-
-                <div class="withdrawal-stats">
-                    <div class="w-stat pending">
-                        <span class="w-stat-num" id="w-pending-count">0</span>
-                        <span class="w-stat-label">Pending</span>
-                    </div>
-                    <div class="w-stat approved">
-                        <span class="w-stat-num" id="w-approved-count">0</span>
-                        <span class="w-stat-label">Approved</span>
-                    </div>
-                    <div class="w-stat rejected">
-                        <span class="w-stat-num" id="w-rejected-count">0</span>
-                        <span class="w-stat-label">Rejected</span>
-                    </div>
-                    <div class="w-stat total">
-                        <span class="w-stat-num" id="w-pending-amount">0.00</span>
-                        <span class="w-stat-label">Pending Amount</span>
-                    </div>
-                </div>
-
-                <div class="filter-bar">
-                    <button class="filter-btn active" onclick="filterWithdrawals('')" data-filter="">All</button>
-                    <button class="filter-btn" onclick="filterWithdrawals('pending')" data-filter="pending">Pending</button>
-                    <button class="filter-btn" onclick="filterWithdrawals('approved')" data-filter="approved">Approved</button>
-                    <button class="filter-btn" onclick="filterWithdrawals('rejected')" data-filter="rejected">Rejected</button>
-                    <button class="export-csv-btn" onclick="exportWithdrawalsCSV()">&#128229; Export CSV</button>
-                </div>
-
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>ID</th>
-                                <th>User</th>
-                                <th>Amount</th>
-                                <th>Method</th>
-                                <th>Wallet</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="withdrawals-table"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Fraud Detection Tab -->
-            <div class="admin-panel" id="panel-fraud">
-                <h2>&#128680; Fraud Detection & Anti-Cheat</h2>
-                <p class="panel-desc">Monitor suspicious activities and configure protection</p>
-
-                <div class="fraud-stats">
-                    <div class="f-stat">
-                        <span class="f-stat-num" id="f-total">0</span>
-                        <span class="f-stat-label">Total Logs</span>
-                    </div>
-                    <div class="f-stat high">
-                        <span class="f-stat-num" id="f-high">0</span>
-                        <span class="f-stat-label">High Severity</span>
-                    </div>
-                    <div class="f-stat medium">
-                        <span class="f-stat-num" id="f-medium">0</span>
-                        <span class="f-stat-label">Medium</span>
-                    </div>
-                    <div class="f-stat" style="border-color:rgba(139,92,246,0.3);">
-                        <span class="f-stat-num" id="f-ip-groups" style="color:var(--purple);">0</span>
-                        <span class="f-stat-label">Shared IPs</span>
-                    </div>
-                    <div class="f-stat" style="border-color:rgba(59,130,246,0.3);">
-                        <span class="f-stat-num" id="f-vpn-count" style="color:var(--blue);">0</span>
-                        <span class="f-stat-label">VPN Users</span>
-                    </div>
-                </div>
-
-                <!-- IP Groups Section -->
-                <div class="fraud-section">
-                    <h3>&#127760; Multi-Account Detection (Shared IPs)</h3>
-                    <div id="ip-groups-list" class="ip-groups-container"></div>
-                </div>
-
-                <!-- VPN Users Section -->
-                <div class="fraud-section">
-                    <h3>&#128274; VPN / Proxy Users</h3>
-                    <div id="vpn-users-list" class="ip-groups-container"></div>
-                </div>
-
-                <div class="fraud-settings">
-                    <h3>&#128737; Security Toggle Controls</h3>
-                    <div class="fraud-settings-grid">
-                        <div class="setting-item">
-                            <label>VPN/Proxy Blocker</label>
-                            <div class="toggle-row">
-                                <span class="toggle-label" id="vpn-blocker-label">OFF</span>
-                                <label class="toggle">
-                                    <input type="checkbox" id="set-vpn-blocker" onchange="updateToggleLabel(this, 'vpn-blocker-label')">
-                                    <span class="slider"></span>
-                                </label>
+                <!-- Content Area -->
+                <div class="admin-content">
+                    <!-- Stats Overview -->
+                    <div class="stats-row">
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <span class="stat-icon users-icon">&#128101;</span>
+                                <span class="stat-trend up">&#9650; Live</span>
                             </div>
-                            <small class="setting-desc">Block VPN/Proxy users from earning</small>
+                            <span class="stat-num" id="total-users">0</span>
+                            <span class="stat-label">Total Users</span>
                         </div>
-                        <div class="setting-item">
-                            <label>InitData Check</label>
-                            <div class="toggle-row">
-                                <span class="toggle-label" id="initdata-label">ON</span>
-                                <label class="toggle">
-                                    <input type="checkbox" id="set-initdata-check" checked onchange="updateToggleLabel(this, 'initdata-label')">
-                                    <span class="slider"></span>
-                                </label>
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <span class="stat-icon earnings-icon">&#128176;</span>
+                                <span class="stat-trend up">&#9650; USDT</span>
                             </div>
-                            <small class="setting-desc">Verify Telegram hash on login</small>
+                            <span class="stat-num" id="total-earnings">0.0000</span>
+                            <span class="stat-label">Total Earnings</span>
                         </div>
-                        <div class="setting-item">
-                            <label>Single Device Login</label>
-                            <div class="toggle-row">
-                                <span class="toggle-label" id="single-device-label">OFF</span>
-                                <label class="toggle">
-                                    <input type="checkbox" id="set-single-device" onchange="updateToggleLabel(this, 'single-device-label')">
-                                    <span class="slider"></span>
-                                </label>
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <span class="stat-icon referrals-icon">&#128640;</span>
+                                <span class="stat-trend up">&#9650; Active</span>
                             </div>
-                            <small class="setting-desc">Logout other devices on new login</small>
+                            <span class="stat-num" id="total-referrals">0</span>
+                            <span class="stat-label">Referrals</span>
                         </div>
-                        <div class="setting-item">
-                            <label>Strict Ad Timer</label>
-                            <div class="toggle-row">
-                                <span class="toggle-label" id="strict-timer-label">ON</span>
-                                <label class="toggle">
-                                    <input type="checkbox" id="set-strict-timer" checked onchange="updateToggleLabel(this, 'strict-timer-label')">
-                                    <span class="slider"></span>
-                                </label>
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <span class="stat-icon withdraw-icon">&#128179;</span>
+                                <span class="stat-trend warn" id="pending-withdraw-trend">&#9679; Pending</span>
                             </div>
-                            <small class="setting-desc">Validate ad view duration server-side</small>
+                            <span class="stat-num" id="pending-withdrawals">0</span>
+                            <span class="stat-label">Pending Payouts</span>
                         </div>
-                        <div class="setting-item">
-                            <label>Auto Block Fraud</label>
-                            <div class="toggle-row">
-                                <span class="toggle-label" id="auto-block-label">OFF</span>
-                                <label class="toggle">
-                                    <input type="checkbox" id="set-auto-block" onchange="updateToggleLabel(this, 'auto-block-label')">
-                                    <span class="slider"></span>
-                                </label>
+                        <div class="stat-card">
+                            <div class="stat-card-header">
+                                <span class="stat-icon fraud-icon">&#128680;</span>
+                                <span class="stat-trend danger" id="fraud-trend">&#9679; Alerts</span>
                             </div>
-                            <small class="setting-desc">Auto-ban flagged users (OFF = flag only)</small>
-                        </div>
-                        <div class="setting-item">
-                            <label>Max Ads Per Minute</label>
-                            <input type="number" id="set-max-ads-minute" value="10" min="1">
-                        </div>
-                        <div class="setting-item">
-                            <label>Max Daily Withdrawals</label>
-                            <input type="number" id="set-max-daily-withdrawals" value="3" min="1">
+                            <span class="stat-num" id="fraud-alerts">0</span>
+                            <span class="stat-label">Fraud Alerts</span>
                         </div>
                     </div>
-                    <button class="save-btn" onclick="saveFraudSettings()">&#128190; Save Security Settings</button>
-                </div>
 
-                <!-- Flagged Users Section -->
-                <div class="fraud-section">
-                    <h3>&#9888; Flagged Users (Pending Review)</h3>
-                    <div id="flagged-users-list" class="flagged-users-container"></div>
-                </div>
+                    <!-- Dashboard Tab (DEFAULT) -->
+                    <div class="admin-panel active" id="panel-dashboard">
+                        <h2>&#128202; Analytics Dashboard</h2>
+                        <p class="panel-desc">Platform overview and performance metrics</p>
 
-                <h3 class="logs-title">&#128203; Suspicious Activity Logs</h3>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Type</th>
-                                <th>Description</th>
-                                <th>IP</th>
-                                <th>Severity</th>
-                                <th>Date</th>
-                            </tr>
-                        </thead>
-                        <tbody id="fraud-logs-table"></tbody>
-                    </table>
-                </div>
-            </div>
+                        <div class="dash-summary">
+                            <div class="dash-card">
+                                <span class="dash-card-icon users-icon">&#128101;</span>
+                                <span class="dash-card-val" id="d-total-users">0</span>
+                                <span class="dash-card-label">Total Users</span>
+                            </div>
+                            <div class="dash-card">
+                                <span class="dash-card-icon today-icon">&#128200;</span>
+                                <span class="dash-card-val" id="d-new-today">0</span>
+                                <span class="dash-card-label">New Today</span>
+                            </div>
+                            <div class="dash-card">
+                                <span class="dash-card-icon earnings-icon">&#128176;</span>
+                                <span class="dash-card-val" id="d-total-earnings">0</span>
+                                <span class="dash-card-label">Total Earnings</span>
+                            </div>
+                            <div class="dash-card">
+                                <span class="dash-card-icon platform-icon">&#128225;</span>
+                                <span class="dash-card-val" id="d-total-platforms">0</span>
+                                <span class="dash-card-label">Platforms</span>
+                            </div>
+                            <div class="dash-card">
+                                <span class="dash-card-icon payout-icon">&#128179;</span>
+                                <span class="dash-card-val" id="d-total-payouts">0</span>
+                                <span class="dash-card-label">Total Payouts</span>
+                            </div>
+                            <div class="dash-card">
+                                <span class="dash-card-icon pending-icon">&#9203;</span>
+                                <span class="dash-card-val" id="d-pending-count">0</span>
+                                <span class="dash-card-label">Pending Payouts</span>
+                            </div>
+                        </div>
 
-            <!-- Settings Tab -->
-            <div class="admin-panel" id="panel-settings">
-                <h2>&#9881; Bot Settings</h2>
-                <div class="settings-grid">
-                    <div class="setting-item">
-                        <label>Referral Reward (USDT)</label>
-                        <input type="number" step="0.0001" id="set-referral-reward" value="0.001">
-                    </div>
-                    <div class="setting-item">
-                        <label>Min Ads for Referral Reward</label>
-                        <input type="number" id="set-min-ads-referral" value="5">
-                        <small style="color:var(--text2);font-size:11px;">Referred user must view this many ads before referrer gets paid</small>
-                    </div>
-                    <div class="setting-item">
-                        <label>Min Withdraw (USDT)</label>
-                        <input type="number" step="0.01" id="set-min-withdraw" value="0.01">
-                    </div>
-                    <div class="setting-item">
-                        <label>Farm Rate (USDT per cycle)</label>
-                        <input type="number" step="0.001" id="set-farm-rate" value="0.001">
-                    </div>
-                    <div class="setting-item">
-                        <label>Farm Duration (hours)</label>
-                        <input type="number" id="set-farm-duration" value="4">
-                    </div>
-                    <div class="setting-item">
-                        <label>Admin Password</label>
-                        <input type="text" id="set-admin-password" value="">
-                    </div>
-                </div>
-                <button class="save-btn" onclick="saveSettings()">&#128190; Save Settings</button>
-            </div>
-
-            <!-- Users Tab -->
-            <div class="admin-panel" id="panel-users">
-                <h2>&#128101; User Management</h2>
-                <div class="search-bar-row">
-                    <input type="text" id="user-search" placeholder="&#128269; Search by ID or username..." oninput="searchUsers()">
-                    <button class="export-csv-btn" onclick="exportUsersCSV()">&#128229; Export CSV</button>
-                </div>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>User ID</th>
-                                <th>Username</th>
-                                <th>Name</th>
-                                <th>Balance</th>
-                                <th>Tasks</th>
-                                <th>Referrals</th>
-                                <th>IP Address</th>
-                                <th>Location</th>
-                                <th>VPN</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-table"></tbody>
-                    </table>
-                </div>
-                <div class="pagination">
-                    <button onclick="loadUsers(currentPage - 1)" id="prev-page">&#9664; Prev</button>
-                    <span id="page-info">Page 1</span>
-                    <button onclick="loadUsers(currentPage + 1)" id="next-page">Next &#9654;</button>
-                </div>
-            </div>
-
-            <!-- Referrals Tab -->
-            <div class="admin-panel" id="panel-referrals">
-                <h2>&#128640; Referral System</h2>
-
-                <div class="ref-summary-cards">
-                    <div class="ref-stat-card">
-                        <div class="ref-stat-icon">&#128101;</div>
-                        <div class="ref-stat-info">
-                            <div class="ref-stat-label">Total Referrals</div>
-                            <div class="ref-stat-value" id="ref-total">0</div>
+                        <div class="chart-row">
+                            <div class="chart-box">
+                                <h3>&#128200; User Growth (Last 30 Days)</h3>
+                                <canvas id="chart-users"></canvas>
+                            </div>
+                            <div class="chart-box">
+                                <h3>&#128202; Daily Impressions</h3>
+                                <canvas id="chart-impressions"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-row">
+                            <div class="chart-box">
+                                <h3>&#128176; Payout Trends</h3>
+                                <canvas id="chart-payouts"></canvas>
+                            </div>
+                            <div class="chart-box">
+                                <h3>&#128225; Ad Views by Platform</h3>
+                                <canvas id="chart-platforms"></canvas>
+                            </div>
                         </div>
                     </div>
-                    <div class="ref-stat-card">
-                        <div class="ref-stat-icon">&#128176;</div>
-                        <div class="ref-stat-info">
-                            <div class="ref-stat-label">Commission Paid ($)</div>
-                            <div class="ref-stat-value" id="ref-commission">0.0000</div>
+
+                    <!-- Ads Platforms Tab -->
+                    <div class="admin-panel" id="panel-platforms">
+                        <h2>&#128225; Ad Platform Manager</h2>
+                        <p class="panel-desc">Add, edit, or remove ad platforms</p>
+
+                        <div class="platform-header">
+                            <button class="save-btn" style="max-width:240px" onclick="openPlatformModal()">&#10010; Add New Platform</button>
+                        </div>
+
+                        <div id="platforms-list"></div>
+                    </div>
+
+                    <!-- Ad Rates Tab -->
+                    <div class="admin-panel" id="panel-rates">
+                        <h2>&#128200; Ad Network Rates</h2>
+                        <p class="panel-desc">Set reward rates for each ad network</p>
+                        <div id="rates-list"></div>
+                        <button class="save-btn" onclick="saveAllRates()">&#128190; Save All Rates</button>
+                    </div>
+
+                    <!-- Withdrawals Tab -->
+                    <div class="admin-panel" id="panel-withdrawals">
+                        <h2>&#128179; Withdrawal Management</h2>
+                        <p class="panel-desc">Review and process user payout requests</p>
+
+                        <div class="withdrawal-stats">
+                            <div class="w-stat pending">
+                                <span class="w-stat-num" id="w-pending-count">0</span>
+                                <span class="w-stat-label">Pending</span>
+                            </div>
+                            <div class="w-stat approved">
+                                <span class="w-stat-num" id="w-approved-count">0</span>
+                                <span class="w-stat-label">Approved</span>
+                            </div>
+                            <div class="w-stat rejected">
+                                <span class="w-stat-num" id="w-rejected-count">0</span>
+                                <span class="w-stat-label">Rejected</span>
+                            </div>
+                            <div class="w-stat total">
+                                <span class="w-stat-num" id="w-pending-amount">0.00</span>
+                                <span class="w-stat-label">Pending Amount</span>
+                            </div>
+                        </div>
+
+                        <div class="filter-bar">
+                            <button class="filter-btn active" onclick="filterWithdrawals('')" data-filter="">All</button>
+                            <button class="filter-btn" onclick="filterWithdrawals('pending')" data-filter="pending">Pending</button>
+                            <button class="filter-btn" onclick="filterWithdrawals('approved')" data-filter="approved">Approved</button>
+                            <button class="filter-btn" onclick="filterWithdrawals('rejected')" data-filter="rejected">Rejected</button>
+                            <button class="export-csv-btn" onclick="exportWithdrawalsCSV()">&#128229; Export CSV</button>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>User</th>
+                                        <th>Amount</th>
+                                        <th>Method</th>
+                                        <th>Wallet</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="withdrawals-table"></tbody>
+                            </table>
                         </div>
                     </div>
-                    <div class="ref-stat-card">
-                        <div class="ref-stat-icon">&#127942;</div>
-                        <div class="ref-stat-info">
-                            <div class="ref-stat-label">Top Referrer</div>
-                            <div class="ref-stat-value" id="ref-top" style="font-size:13px;">-</div>
-                            <div class="ref-stat-sub" id="ref-top-count"></div>
+
+                    <!-- Fraud Detection Tab -->
+                    <div class="admin-panel" id="panel-fraud">
+                        <h2>&#128680; Fraud Detection & Anti-Cheat</h2>
+                        <p class="panel-desc">Monitor suspicious activities and configure protection</p>
+
+                        <div class="fraud-stats">
+                            <div class="f-stat">
+                                <span class="f-stat-num" id="f-total">0</span>
+                                <span class="f-stat-label">Total Logs</span>
+                            </div>
+                            <div class="f-stat high">
+                                <span class="f-stat-num" id="f-high">0</span>
+                                <span class="f-stat-label">High Severity</span>
+                            </div>
+                            <div class="f-stat medium">
+                                <span class="f-stat-num" id="f-medium">0</span>
+                                <span class="f-stat-label">Medium</span>
+                            </div>
+                            <div class="f-stat" style="border-color:rgba(139,92,246,0.3);">
+                                <span class="f-stat-num" id="f-ip-groups" style="color:var(--purple);">0</span>
+                                <span class="f-stat-label">Shared IPs</span>
+                            </div>
+                            <div class="f-stat" style="border-color:rgba(59,130,246,0.3);">
+                                <span class="f-stat-num" id="f-vpn-count" style="color:var(--blue);">0</span>
+                                <span class="f-stat-label">VPN Users</span>
+                            </div>
+                        </div>
+
+                        <!-- IP Groups Section -->
+                        <div class="fraud-section">
+                            <h3>&#127760; Multi-Account Detection (Shared IPs)</h3>
+                            <div id="ip-groups-list" class="ip-groups-container"></div>
+                        </div>
+
+                        <!-- VPN Users Section -->
+                        <div class="fraud-section">
+                            <h3>&#128274; VPN / Proxy Users</h3>
+                            <div id="vpn-users-list" class="ip-groups-container"></div>
+                        </div>
+
+                        <div class="fraud-settings">
+                            <h3>&#128737; Security Toggle Controls</h3>
+                            <div class="fraud-settings-grid">
+                                <div class="setting-item">
+                                    <label>VPN/Proxy Blocker</label>
+                                    <div class="toggle-row">
+                                        <span class="toggle-label" id="vpn-blocker-label">OFF</span>
+                                        <label class="toggle">
+                                            <input type="checkbox" id="set-vpn-blocker" onchange="updateToggleLabel(this, 'vpn-blocker-label')">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <small class="setting-desc">Block VPN/Proxy users from earning</small>
+                                </div>
+                                <div class="setting-item">
+                                    <label>InitData Check</label>
+                                    <div class="toggle-row">
+                                        <span class="toggle-label" id="initdata-label">ON</span>
+                                        <label class="toggle">
+                                            <input type="checkbox" id="set-initdata-check" checked onchange="updateToggleLabel(this, 'initdata-label')">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <small class="setting-desc">Verify Telegram hash on login</small>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Single Device Login</label>
+                                    <div class="toggle-row">
+                                        <span class="toggle-label" id="single-device-label">OFF</span>
+                                        <label class="toggle">
+                                            <input type="checkbox" id="set-single-device" onchange="updateToggleLabel(this, 'single-device-label')">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <small class="setting-desc">Logout other devices on new login</small>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Strict Ad Timer</label>
+                                    <div class="toggle-row">
+                                        <span class="toggle-label" id="strict-timer-label">ON</span>
+                                        <label class="toggle">
+                                            <input type="checkbox" id="set-strict-timer" checked onchange="updateToggleLabel(this, 'strict-timer-label')">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <small class="setting-desc">Validate ad view duration server-side</small>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Auto Block Fraud</label>
+                                    <div class="toggle-row">
+                                        <span class="toggle-label" id="auto-block-label">OFF</span>
+                                        <label class="toggle">
+                                            <input type="checkbox" id="set-auto-block" onchange="updateToggleLabel(this, 'auto-block-label')">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </div>
+                                    <small class="setting-desc">Auto-ban flagged users (OFF = flag only)</small>
+                                </div>
+                                <div class="setting-item">
+                                    <label>Max Ads Per Minute</label>
+                                    <input type="number" id="set-max-ads-minute" value="10" min="1">
+                                </div>
+                                <div class="setting-item">
+                                    <label>Max Daily Withdrawals</label>
+                                    <input type="number" id="set-max-daily-withdrawals" value="3" min="1">
+                                </div>
+                            </div>
+                            <button class="save-btn" onclick="saveFraudSettings()">&#128190; Save Security Settings</button>
+                        </div>
+
+                        <!-- Flagged Users Section -->
+                        <div class="fraud-section">
+                            <h3>&#9888; Flagged Users (Pending Review)</h3>
+                            <div id="flagged-users-list" class="flagged-users-container"></div>
+                        </div>
+
+                        <h3 class="logs-title">&#128203; Suspicious Activity Logs</h3>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>User</th>
+                                        <th>Type</th>
+                                        <th>Description</th>
+                                        <th>IP</th>
+                                        <th>Severity</th>
+                                        <th>Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fraud-logs-table"></tbody>
+                            </table>
                         </div>
                     </div>
-                </div>
 
-                <div class="referral-rules">
-                    <div class="ref-rule-card">
-                        <h3>&#128161; How it works</h3>
-                        <ul>
-                            <li>Rewards are <strong>held pending</strong> until referred user views 5 ads</li>
-                            <li>Same-IP referrals are <strong>auto-flagged</strong></li>
-                            <li>Admin can manually flag/unflag referrals</li>
-                        </ul>
+                    <!-- Settings Tab -->
+                    <div class="admin-panel" id="panel-settings">
+                        <h2>&#9881; Bot Settings</h2>
+                        <div class="settings-grid">
+                            <div class="setting-item">
+                                <label>Referral Reward (USDT)</label>
+                                <input type="number" step="0.0001" id="set-referral-reward" value="0.001">
+                            </div>
+                            <div class="setting-item">
+                                <label>Min Ads for Referral Reward</label>
+                                <input type="number" id="set-min-ads-referral" value="5">
+                                <small style="color:var(--text2);font-size:11px;">Referred user must view this many ads before referrer gets paid</small>
+                            </div>
+                            <div class="setting-item">
+                                <label>Min Withdraw (USDT)</label>
+                                <input type="number" step="0.01" id="set-min-withdraw" value="0.01">
+                            </div>
+                            <div class="setting-item">
+                                <label>Farm Rate (USDT per cycle)</label>
+                                <input type="number" step="0.001" id="set-farm-rate" value="0.001">
+                            </div>
+                            <div class="setting-item">
+                                <label>Farm Duration (hours)</label>
+                                <input type="number" id="set-farm-duration" value="4">
+                            </div>
+                            <div class="setting-item">
+                                <label>Admin Password</label>
+                                <input type="text" id="set-admin-password" value="">
+                            </div>
+                        </div>
+                        <button class="save-btn" onclick="saveSettings()">&#128190; Save Settings</button>
                     </div>
-                    <div class="ref-rule-card">
-                        <h3>&#128279; Referral Link Format</h3>
-                        <code>https://t.me/mynhp_bot?start=ref_USERID</code>
-                        <p style="margin-top:8px;font-size:12px;color:var(--text2);">Minimum ad views to unlock referral bonus (configurable in Settings)</p>
+
+                    <!-- Users Tab -->
+                    <div class="admin-panel" id="panel-users">
+                        <h2>&#128101; User Management</h2>
+                        <div class="search-bar-row">
+                            <input type="text" id="user-search" placeholder="&#128269; Search by ID or username..." oninput="searchUsers()">
+                            <button class="export-csv-btn" onclick="exportUsersCSV()">&#128229; Export CSV</button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>User ID</th>
+                                        <th>Username</th>
+                                        <th>Name</th>
+                                        <th>Balance</th>
+                                        <th>Tasks</th>
+                                        <th>Referrals</th>
+                                        <th>IP Address</th>
+                                        <th>Location</th>
+                                        <th>VPN</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-table"></tbody>
+                            </table>
+                        </div>
+                        <div class="pagination">
+                            <button onclick="loadUsers(currentPage - 1)" id="prev-page">&#9664; Prev</button>
+                            <span id="page-info">Page 1</span>
+                            <button onclick="loadUsers(currentPage + 1)" id="next-page">Next &#9654;</button>
+                        </div>
                     </div>
-                </div>
 
-                <div class="search-bar-row">
-                    <input type="text" id="referral-search" placeholder="&#128269; Search by Referrer ID, Referred ID, or username..." oninput="searchReferrals()">
-                    <button class="export-csv-btn" onclick="exportReferralsCSV()">&#128229; Export CSV</button>
-                    <button class="btn-auto-flag" onclick="autoFlagIPReferrals()">&#128683; Auto-Flag Same IPs</button>
-                </div>
+                    <!-- Referrals Tab -->
+                    <div class="admin-panel" id="panel-referrals">
+                        <h2>&#128640; Referral System</h2>
 
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Referrer</th>
-                                <th>Referred User</th>
-                                <th>Joined</th>
-                                <th>Commission</th>
-                                <th>Ads Viewed</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="referrals-table"></tbody>
-                    </table>
+                        <div class="ref-summary-cards">
+                            <div class="ref-stat-card">
+                                <div class="ref-stat-icon">&#128101;</div>
+                                <div class="ref-stat-info">
+                                    <div class="ref-stat-label">Total Referrals</div>
+                                    <div class="ref-stat-value" id="ref-total">0</div>
+                                </div>
+                            </div>
+                            <div class="ref-stat-card">
+                                <div class="ref-stat-icon">&#128176;</div>
+                                <div class="ref-stat-info">
+                                    <div class="ref-stat-label">Commission Paid ($)</div>
+                                    <div class="ref-stat-value" id="ref-commission">0.0000</div>
+                                </div>
+                            </div>
+                            <div class="ref-stat-card">
+                                <div class="ref-stat-icon">&#127942;</div>
+                                <div class="ref-stat-info">
+                                    <div class="ref-stat-label">Top Referrer</div>
+                                    <div class="ref-stat-value" id="ref-top" style="font-size:13px;">-</div>
+                                    <div class="ref-stat-sub" id="ref-top-count"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="referral-rules">
+                            <div class="ref-rule-card">
+                                <h3>&#128161; How it works</h3>
+                                <ul>
+                                    <li>Rewards are <strong>held pending</strong> until referred user views 5 ads</li>
+                                    <li>Same-IP referrals are <strong>auto-flagged</strong></li>
+                                    <li>Admin can manually flag/unflag referrals</li>
+                                </ul>
+                            </div>
+                            <div class="ref-rule-card">
+                                <h3>&#128279; Referral Link Format</h3>
+                                <code>https://t.me/mynhp_bot?start=ref_USERID</code>
+                                <p style="margin-top:8px;font-size:12px;color:var(--text2);">Minimum ad views to unlock referral bonus (configurable in Settings)</p>
+                            </div>
+                        </div>
+
+                        <div class="search-bar-row">
+                            <input type="text" id="referral-search" placeholder="&#128269; Search by Referrer ID, Referred ID, or username..." oninput="searchReferrals()">
+                            <button class="export-csv-btn" onclick="exportReferralsCSV()">&#128229; Export CSV</button>
+                            <button class="btn-auto-flag" onclick="autoFlagIPReferrals()">&#128683; Auto-Flag Same IPs</button>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Referrer</th>
+                                        <th>Referred User</th>
+                                        <th>Joined</th>
+                                        <th>Commission</th>
+                                        <th>Ads Viewed</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="referrals-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -633,6 +685,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=8"></script>
+    <script src="/static/admin.js?v=9"></script>
 </body>
 </html>
