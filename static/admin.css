@@ -582,6 +582,26 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 
 .hidden { display: none !important; }
 
+/* ===== USER FILTER BAR ===== */
+.user-filter-bar { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+
+/* ===== LIVE DOT ===== */
+.live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #22c55e;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(34,197,94,0.6);
+    animation: livePulse 2s ease-in-out infinite;
+    vertical-align: middle;
+    margin-right: 2px;
+}
+@keyframes livePulse {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(34,197,94,0.6); }
+    50% { opacity: 0.5; box-shadow: 0 0 12px rgba(34,197,94,0.8); }
+}
+
 /* ===== LOGIN LOG STATS ===== */
 .login-log-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
 .ll-stat { background: var(--bg2); border-radius: 10px; padding: 14px; text-align: center; border: 1px solid var(--border); }

@@ -44,6 +44,11 @@ async def init_db():
             except Exception:
                 pass
 
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        except Exception:
+            pass
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ad_rates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -442,16 +447,35 @@ async def get_referral_count(user_id: int) -> int:
             return row[0]
 
 
-async def get_all_users(page: int = 0, limit: int = 50) -> List[dict]:
+async def get_all_users(page: int = 0, limit: int = 50, filter_type: str = "", search: str = "") -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
+        where_clauses = []
+        params = []
+
+        if search:
+            where_clauses.append("(user_id = ? OR username LIKE ? OR first_name LIKE ?)")
+            params.extend([search, f"%{search}%", f"%{search}%"])
+
+        if filter_type == "active_24h":
+            where_clauses.append("last_active >= datetime('now', '-24 hours')")
+        elif filter_type == "online":
+            where_clauses.append("last_active >= datetime('now', '-15 minutes')")
+        elif filter_type == "banned":
+            where_clauses.append("is_banned = 1")
+
+        where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        count_query = f"SELECT COUNT(*) FROM users{where_sql}"
+        async with db.execute(count_query, params) as cursor:
+            total = (await cursor.fetchone())[0]
+
         offset = page * limit
-        async with db.execute(
-            "SELECT * FROM users ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (limit, offset)
-        ) as cursor:
-            rows = await cursor.fetchall()
-            return [dict(r) for r in rows]
+        query = f"SELECT * FROM users{where_sql} ORDER BY last_active DESC, created_at DESC LIMIT ? OFFSET ?"
+        async with db.execute(query, params + [limit, offset]) as cursor:
+            rows = [dict(r) for r in await cursor.fetchall()]
+
+        return {"users": rows, "total": total, "page": page, "pages": max(1, -(-total // limit))}
 
 
 async def get_total_earnings() -> float:
@@ -822,6 +846,12 @@ async def get_vpn_users() -> List[dict]:
 async def update_session_id(user_id: int, session_id: str):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE users SET session_id = ? WHERE user_id = ?", (session_id, user_id))
+        await db.commit()
+
+
+async def update_last_active(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
         await db.commit()
 
 

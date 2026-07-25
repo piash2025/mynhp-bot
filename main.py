@@ -63,6 +63,7 @@ from database import (
     get_login_logs,
     get_login_log_stats,
     cleanup_old_login_logs,
+    update_last_active,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -243,6 +244,8 @@ async def track_user(request: Request):
                            log_status, "telegram_initdata", ip, location, is_vpn,
                            device_platform, user_agent, failure_reason)
 
+    await update_last_active(user_id)
+
     # VPN soft warning — return flag instead of hard block
     vpn_setting = await get_admin_setting("vpn_blocker")
     if vpn_setting == "1" and is_vpn:
@@ -267,6 +270,7 @@ async def tool_use(request: Request):
         if vpn_setting == "1" and user and user.get("is_vpn"):
             return {"status": "error", "vpn_warning": True, "message": "VPN detected. Please disable VPN to earn rewards."}
         await increment_tool_use(user_id)
+        await update_last_active(user_id)
         # Record ad start time for invisible time validation
         _ad_start_times[user_id] = time.time()
         return {"status": "ok"}
@@ -331,6 +335,7 @@ async def update_user_balance(request: Request):
             return {"status": "error", "vpn_warning": True, "message": "VPN detected. Please disable VPN to earn rewards."}
 
         await update_balance(user_id, reward)
+        await update_last_active(user_id)
         await check_referral_release(user_id)
         user = await get_user(user_id)
         if user:
@@ -475,8 +480,10 @@ async def admin_users(request: Request):
 
     page = int(request.query_params.get("page", 0))
     limit = int(request.query_params.get("limit", 50))
-    users = await get_all_users(page=page, limit=limit)
-    return {"users": users}
+    filter_type = request.query_params.get("filter", "")
+    search = request.query_params.get("search", "")
+    result = await get_all_users(page=page, limit=limit, filter_type=filter_type, search=search)
+    return result
 
 
 # ===== WITHDRAWAL API =====

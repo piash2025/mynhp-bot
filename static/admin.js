@@ -245,18 +245,48 @@ async function saveSettings() {
 }
 
 // ===== USERS =====
+var userFilter = '';
+var userSearchDebounce = null;
+
 async function loadUsers(page) {
     if (page < 0) page = 0;
     currentPage = page;
     try {
-        var resp = await fetch('/api/admin/users?password=' + adminToken + '&page=' + page);
+        var search = document.getElementById('user-search') ? document.getElementById('user-search').value : '';
+        var resp = await fetch('/api/admin/users?password=' + adminToken + '&page=' + page + '&filter=' + encodeURIComponent(userFilter) + '&search=' + encodeURIComponent(search));
         var data = await resp.json();
         allUsers = data.users || [];
         renderUsers(allUsers);
-        document.getElementById('page-info').textContent = 'Page ' + (page + 1);
+        document.getElementById('page-info').textContent = 'Page ' + (page + 1) + ' of ' + (data.pages || 1);
         document.getElementById('prev-page').disabled = page === 0;
         document.getElementById('next-page').disabled = allUsers.length < 50;
     } catch (e) { /* ignore */ }
+}
+
+function filterUsers(btn, filter) {
+    userFilter = filter;
+    document.querySelectorAll('.user-filter-bar .filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    loadUsers(0);
+}
+
+function timeAgo(timestamp) {
+    if (!timestamp) return 'Never';
+    var now = Date.now();
+    var then = new Date(timestamp + (timestamp.endsWith('Z') ? '' : 'Z')).getTime();
+    var diff = Math.floor((now - then) / 1000);
+    if (diff < 0) return 'Just now';
+    if (diff < 60) return diff + 's ago';
+    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff / 86400) + 'd ago';
+    return Math.floor(diff / 604800) + 'w ago';
+}
+
+function isOnline(timestamp) {
+    if (!timestamp) return false;
+    var then = new Date(timestamp + (timestamp.endsWith('Z') ? '' : 'Z')).getTime();
+    return (Date.now() - then) < 15 * 60 * 1000;
 }
 
 function renderUsers(users) {
@@ -272,6 +302,9 @@ function renderUsers(users) {
         var banBtn = u.is_banned
             ? '<button class="btn-unban" onclick="unbanUser(' + u.user_id + ')">&#10010; Unban</button>'
             : '<button class="btn-ban" onclick="banUser(' + u.user_id + ')">&#128683; Ban</button>';
+        var online = isOnline(u.last_active);
+        var liveDot = online ? '<span class="live-dot"></span>' : '';
+        var lastActive = timeAgo(u.last_active);
         tbody.innerHTML += '<tr>' +
             '<td>' + u.user_id + '</td>' +
             '<td>@' + (u.username || '-') + '</td>' +
@@ -282,6 +315,7 @@ function renderUsers(users) {
             '<td style="font-family:monospace;font-size:11px;">' + (u.ip_address || '-') + '</td>' +
             '<td>' + flag + ' ' + location + '</td>' +
             '<td>' + vpnBadge + '</td>' +
+            '<td style="white-space:nowrap;">' + liveDot + ' <span style="font-size:12px;color:var(--text2);">' + lastActive + '</span></td>' +
             '<td>' + statusBadge + '</td>' +
             '<td>' + banBtn + '</td></tr>';
     });
@@ -317,13 +351,8 @@ function unbanUser(userId) {
 }
 
 function searchUsers() {
-    var query = document.getElementById('user-search').value.toLowerCase();
-    var filtered = allUsers.filter(function(u) {
-        return String(u.user_id).includes(query) ||
-            (u.username && u.username.toLowerCase().includes(query)) ||
-            (u.first_name && u.first_name.toLowerCase().includes(query));
-    });
-    renderUsers(filtered);
+    clearTimeout(userSearchDebounce);
+    userSearchDebounce = setTimeout(function() { loadUsers(0); }, 300);
 }
 
 // ===== WITHDRAWALS =====
@@ -1003,10 +1032,10 @@ function exportWithdrawalsCSV() {
 
 function exportUsersCSV() {
     try {
-        fetch('/api/admin/users?password=' + adminToken + '&page=0&limit=10000').then(function(r) { return r.json(); }).then(function(data) {
-            var rows = [['User ID', 'Username', 'First Name', 'Balance', 'Tasks Done', 'Total Referrals', 'IP Address', 'Country', 'City', 'VPN', 'Banned', 'Joined']];
+        fetch('/api/admin/users?password=' + adminToken + '&page=0&limit=10000&filter=' + encodeURIComponent(userFilter)).then(function(r) { return r.json(); }).then(function(data) {
+            var rows = [['User ID', 'Username', 'First Name', 'Balance', 'Tasks Done', 'Total Referrals', 'IP Address', 'Country', 'City', 'VPN', 'Banned', 'Last Active', 'Joined']];
             (data.users || []).forEach(function(u) {
-                rows.push([u.user_id, u.username || '', u.first_name || '', u.balance || 0, u.tasks_done || 0, u.total_referrals || 0, u.ip_address || '', u.country || '', u.city || '', u.is_vpn ? 'Yes' : 'No', u.is_banned ? 'Yes' : 'No', u.created_at || '']);
+                rows.push([u.user_id, u.username || '', u.first_name || '', u.balance || 0, u.tasks_done || 0, u.total_referrals || 0, u.ip_address || '', u.country || '', u.city || '', u.is_vpn ? 'Yes' : 'No', u.is_banned ? 'Yes' : 'No', u.last_active || '', u.created_at || '']);
             });
             var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
             downloadCSV('users_' + new Date().toISOString().slice(0, 10) + '.csv', csv);

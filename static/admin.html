@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=10">
+    <link rel="stylesheet" href="/static/admin.css?v=11">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -453,6 +453,14 @@
                     <!-- Users Tab -->
                     <div class="admin-panel" id="panel-users">
                         <h2>&#128101; User Management</h2>
+
+                        <div class="user-filter-bar">
+                            <button class="filter-btn active" data-filter="" onclick="filterUsers(this, '')">All Users</button>
+                            <button class="filter-btn" data-filter="active_24h" onclick="filterUsers(this, 'active_24h')">&#128994; Active (24h)</button>
+                            <button class="filter-btn" data-filter="online" onclick="filterUsers(this, 'online')">&#128993; Online Now</button>
+                            <button class="filter-btn" data-filter="banned" onclick="filterUsers(this, 'banned')">&#128683; Banned</button>
+                        </div>
+
                         <div class="search-bar-row">
                             <input type="text" id="user-search" placeholder="&#128269; Search by ID or username..." oninput="searchUsers()">
                             <button class="export-csv-btn" onclick="exportUsersCSV()">&#128229; Export CSV</button>
@@ -470,6 +478,7 @@
                                         <th>IP Address</th>
                                         <th>Location</th>
                                         <th>VPN</th>
+                                        <th>Last Active</th>
                                         <th>Status</th>
                                         <th>Actions</th>
                                     </tr>
@@ -765,6 +774,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=10"></script>
+    <script src="/static/admin.js?v=11"></script>
 </body>
 </html>
