@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=15">
+    <link rel="stylesheet" href="/static/admin.css?v=16">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -116,62 +116,62 @@
 
                 <!-- Content Area -->
                 <div class="admin-content">
-                    <!-- Stats Overview -->
-                    <div class="stats-row">
-                        <div class="stat-card">
-                            <div class="stat-card-header">
-                                <span class="stat-icon users-icon">&#128101;</span>
-                                <span class="stat-trend up">&#9650; Live</span>
-                            </div>
-                            <span class="stat-num" id="total-users">0</span>
-                            <span class="stat-label">Total Users</span>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-header">
-                                <span class="stat-icon earnings-icon">&#128176;</span>
-                                <span class="stat-trend up">&#9650; USDT</span>
-                            </div>
-                            <span class="stat-num" id="total-earnings">0.0000</span>
-                            <span class="stat-label">Total Earnings</span>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-header">
-                                <span class="stat-icon referrals-icon">&#128640;</span>
-                                <span class="stat-trend up">&#9650; Active</span>
-                            </div>
-                            <span class="stat-num" id="total-referrals">0</span>
-                            <span class="stat-label">Referrals</span>
-                        </div>
-                        <div class="stat-card stat-card-live">
-                            <div class="stat-card-header">
-                                <span class="stat-icon live-icon">&#128994;</span>
-                                <span class="stat-trend up"><span class="live-dot-sm"></span> Live</span>
-                            </div>
-                            <span class="stat-num" id="live-users-count">0</span>
-                            <span class="stat-label">Online Now</span>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-header">
-                                <span class="stat-icon withdraw-icon">&#128179;</span>
-                                <span class="stat-trend warn" id="pending-withdraw-trend">&#9679; Pending</span>
-                            </div>
-                            <span class="stat-num" id="pending-withdrawals">0</span>
-                            <span class="stat-label">Pending Payouts</span>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-card-header">
-                                <span class="stat-icon fraud-icon">&#128680;</span>
-                                <span class="stat-trend danger" id="fraud-trend">&#9679; Alerts</span>
-                            </div>
-                            <span class="stat-num" id="fraud-alerts">0</span>
-                            <span class="stat-label">Fraud Alerts</span>
-                        </div>
-                    </div>
-
                     <!-- Dashboard Tab (DEFAULT) -->
                     <div class="admin-panel active" id="panel-dashboard">
                         <h2>&#128202; Analytics Dashboard</h2>
                         <p class="panel-desc">Platform overview and performance metrics</p>
+
+                        <!-- Stats Overview (Dashboard only) -->
+                        <div class="stats-row">
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-icon users-icon">&#128101;</span>
+                                    <span class="stat-trend up">&#9650; Live</span>
+                                </div>
+                                <span class="stat-num" id="total-users">0</span>
+                                <span class="stat-label">Total Users</span>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-icon earnings-icon">&#128176;</span>
+                                    <span class="stat-trend up">&#9650; USDT</span>
+                                </div>
+                                <span class="stat-num" id="total-earnings">0.0000</span>
+                                <span class="stat-label">Total Earnings</span>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-icon referrals-icon">&#128640;</span>
+                                    <span class="stat-trend up">&#9650; Active</span>
+                                </div>
+                                <span class="stat-num" id="total-referrals">0</span>
+                                <span class="stat-label">Referrals</span>
+                            </div>
+                            <div class="stat-card stat-card-live">
+                                <div class="stat-card-header">
+                                    <span class="stat-icon live-icon">&#128994;</span>
+                                    <span class="stat-trend up"><span class="live-dot-sm"></span> Live</span>
+                                </div>
+                                <span class="stat-num" id="live-users-count">0</span>
+                                <span class="stat-label">Online Now</span>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-icon withdraw-icon">&#128179;</span>
+                                    <span class="stat-trend warn" id="pending-withdraw-trend">&#9679; Pending</span>
+                                </div>
+                                <span class="stat-num" id="pending-withdrawals">0</span>
+                                <span class="stat-label">Pending Payouts</span>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-card-header">
+                                    <span class="stat-icon fraud-icon">&#128680;</span>
+                                    <span class="stat-trend danger" id="fraud-trend">&#9679; Alerts</span>
+                                </div>
+                                <span class="stat-num" id="fraud-alerts">0</span>
+                                <span class="stat-label">Fraud Alerts</span>
+                            </div>
+                        </div>
 
                         <div class="dash-summary">
                             <div class="dash-card">
@@ -970,6 +970,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=15"></script>
+    <script src="/static/admin.js?v=16"></script>
 </body>
 </html>
