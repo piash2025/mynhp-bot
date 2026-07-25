@@ -253,6 +253,7 @@ async def init_db():
                 role TEXT NOT NULL DEFAULT 'moderator',
                 permissions TEXT DEFAULT '[]',
                 status TEXT DEFAULT 'active',
+                country_restriction TEXT DEFAULT 'BD',
                 last_login TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
@@ -1236,16 +1237,16 @@ def verify_password(password: str, password_hash: str, salt: str) -> bool:
     return h.hex() == password_hash
 
 
-async def create_admin_user(username: str, email: str, password: str, role: str = "moderator", permissions: list = None) -> dict:
+async def create_admin_user(username: str, email: str, password: str, role: str = "moderator", permissions: list = None, country_restriction: str = "BD") -> dict:
     password_hash, salt = hash_password(password)
     if permissions is None:
         permissions = []
     async with aiosqlite.connect(DB_PATH) as db:
         try:
             await db.execute("""
-                INSERT INTO admin_users (username, email, password_hash, salt, role, permissions)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (username, email, password_hash, salt, role, json.dumps(permissions)))
+                INSERT INTO admin_users (username, email, password_hash, salt, role, permissions, country_restriction)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (username, email, password_hash, salt, role, json.dumps(permissions), country_restriction))
             await db.commit()
             return {"status": "ok"}
         except aiosqlite.IntegrityError:
@@ -1280,7 +1281,7 @@ async def update_admin_user(admin_id: int, **kwargs) -> bool:
         sets = []
         vals = []
         for k, v in kwargs.items():
-            if k in ("username", "email", "role", "permissions", "status", "password_hash", "salt", "last_login"):
+            if k in ("username", "email", "role", "permissions", "status", "password_hash", "salt", "last_login", "country_restriction"):
                 if k == "permissions" and isinstance(v, list):
                     v = json.dumps(v)
                 sets.append(f"{k}=?")

@@ -1426,7 +1426,7 @@ async function loadAdminUsers() {
         if (data.error) return;
         var tbody = document.getElementById('admin-users-table');
         if (!data.admin_users || data.admin_users.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px;">No admin users found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text2);padding:20px;">No admin users found</td></tr>';
             return;
         }
         tbody.innerHTML = data.admin_users.map(function(u) {
@@ -1439,6 +1439,7 @@ async function loadAdminUsers() {
                 '<td><strong>' + u.username + '</strong></td>' +
                 '<td>' + (u.email || '-') + '</td>' +
                 '<td><span class="status-badge ' + (u.role === 'super_admin' ? 'status-accepted' : 'status-pending') + '">' + u.role + '</span></td>' +
+                '<td><span class="status-badge status-pending">' + (u.country_restriction || 'ALL') + '</span></td>' +
                 '<td style="max-width:260px;">' + permBadges + '</td>' +
                 '<td><span class="status-badge ' + statusClass + '">' + u.status + '</span></td>' +
                 '<td style="font-size:12px;color:var(--text2);">' + (u.last_login ? formatDate(u.last_login) : 'Never') + '</td>' +
@@ -1459,6 +1460,7 @@ function openAddAdminModal() {
     document.getElementById('au-password').value = '';
     document.getElementById('au-password-label').textContent = 'Password *';
     document.getElementById('au-role').value = 'moderator';
+    document.getElementById('au-country').value = 'BD';
     document.querySelectorAll('#au-permissions input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
     openModal('admin-user-modal');
 }
@@ -1477,6 +1479,7 @@ async function editAdminUser(id) {
         document.getElementById('au-password').value = '';
         document.getElementById('au-password-label').textContent = 'New Password (leave blank to keep)';
         document.getElementById('au-role').value = user.role;
+        document.getElementById('au-country').value = user.country_restriction || 'BD';
         var perms = [];
         try { perms = JSON.parse(user.permissions); } catch(e) {}
         document.querySelectorAll('#au-permissions input[type="checkbox"]').forEach(function(cb) {
@@ -1519,7 +1522,7 @@ async function saveAdminUser() {
     if (!id && !password) { showToast('Password required', 'error'); return; }
     if (password && password.length < 6) { showToast('Password min 6 characters', 'error'); return; }
 
-    var body = { username: username, email: email, role: role, permissions: permissions };
+    var body = { username: username, email: email, role: role, permissions: permissions, country_restriction: document.getElementById('au-country').value };
     if (password) body.password = password;
 
     try {

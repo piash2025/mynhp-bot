@@ -90,9 +90,9 @@ from geoip import get_geo_info, extract_ip
 
 # ===== RBAC AUTH SYSTEM =====
 
-async def authenticate_admin(password: str, ip: str = "") -> dict:
+async def authenticate_admin(password: str, request: Request = None) -> dict:
     """Authenticate via legacy admin_password OR new admin_users table.
-    Returns {admin_id, username, role, permissions} or None."""
+    Returns {admin_id, username, role, permissions, country_restriction} or None."""
     stored = await get_admin_setting("admin_password")
     if stored and stored == password:
         return {
@@ -102,17 +102,27 @@ async def authenticate_admin(password: str, ip: str = "") -> dict:
             "permissions": ["manage_admins", "manage_users", "manage_platforms", "manage_rates",
                             "process_withdrawals", "manage_fraud", "manage_settings", "view_accounting",
                             "manage_referrals", "view_logs", "view_task_activities", "view_audit_log"],
+            "country_restriction": "",
         }
     admin = await get_admin_user_by_username(password)
     if admin and verify_password(password, admin["password_hash"], admin["salt"]):
         if admin["status"] != "active":
             return None
+        country_allowed = admin.get("country_restriction", "BD") or ""
+        if country_allowed and request:
+            ip = extract_ip(request)
+            if ip:
+                geo = await get_geo_info(ip)
+                user_country = geo.get("country", "")
+                if user_country and user_country != country_allowed:
+                    return None
         await update_admin_user(admin["id"], last_login=time.strftime("%Y-%m-%d %H:%M:%S"))
         return {
             "admin_id": admin["id"],
             "username": admin["username"],
             "role": admin["role"],
             "permissions": json.loads(admin["permissions"]) if admin["permissions"] else [],
+            "country_restriction": country_allowed,
         }
     return None
 
@@ -129,7 +139,7 @@ async def require_admin(request: Request, permission: str = None):
     """Extract password from query params, authenticate, optionally check permission.
     Returns (admin_info, error_response). error_response is None if OK."""
     password = request.query_params.get("password", "")
-    admin = await authenticate_admin(password)
+    admin = await authenticate_admin(password, request)
     if not admin:
         return None, {"error": "Unauthorized"}
     if permission and not has_permission(admin, permission):
@@ -1070,9 +1080,10 @@ async def create_new_admin(request: Request):
     password = data.get("password", "")
     role = data.get("role", "moderator")
     permissions = data.get("permissions", [])
+    country_restriction = data.get("country_restriction", "BD")
     if not username or not password:
         return {"error": "Username and password required"}
-    result = await create_admin_user(username, email, password, role, permissions)
+    result = await create_admin_user(username, email, password, role, permissions, country_restriction)
     if result.get("error"):
         return result
     await log_admin_action(admin["admin_id"], admin["username"],
@@ -1095,6 +1106,8 @@ async def update_existing_admin(admin_id: int, request: Request):
         updates["permissions"] = data["permissions"]
     if "status" in data:
         updates["status"] = data["status"]
+    if "country_restriction" in data:
+        updates["country_restriction"] = data["country_restriction"]
     if "password" in data and data["password"]:
         from database import hash_password
         pw_hash, salt = hash_password(data["password"])

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=19">
+    <link rel="stylesheet" href="/static/admin.css?v=20">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -791,6 +791,7 @@
                                             <th>Admin Name</th>
                                             <th>Email</th>
                                             <th>Role</th>
+                                            <th>Country</th>
                                             <th>Permissions</th>
                                             <th>Status</th>
                                             <th>Last Login</th>
@@ -1039,6 +1040,21 @@
                         <label class="perm-check"><input type="checkbox" value="view_task_activities"> View Task Activities</label>
                     </div>
                 </div>
+                <div class="modal-field">
+                    <label>Allowed Country (ISO code)</label>
+                    <select id="au-country">
+                        <option value="BD">BD - Bangladesh</option>
+                        <option value="">No Restriction (All Countries)</option>
+                        <option value="IN">IN - India</option>
+                        <option value="PK">PK - Pakistan</option>
+                        <option value="US">US - United States</option>
+                        <option value="GB">GB - United Kingdom</option>
+                        <option value="AE">AE - UAE</option>
+                        <option value="SA">SA - Saudi Arabia</option>
+                        <option value="MY">MY - Malaysia</option>
+                        <option value="SG">SG - Singapore</option>
+                    </select>
+                </div>
             </div>
             <div class="modal-footer">
                 <button class="modal-btn cancel" onclick="closeModal('admin-user-modal')">Cancel</button>
@@ -1047,6 +1063,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=19"></script>
+    <script src="/static/admin.js?v=20"></script>
 </body>
 </html>
