@@ -146,6 +146,17 @@ if (tg?.initDataUnsafe?.user) {
     loadConfig();
     loadStats();
     loadUserData();
+
+    // Heartbeat: ping server every 30s to track online status
+    setInterval(function() {
+        if (currentUser && currentUser.id) {
+            fetch('/api/user/heartbeat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ user_id: currentUser.id }),
+            }).catch(function() {});
+        }
+    }, 30000);
 }
 
 async function loadConfig() {

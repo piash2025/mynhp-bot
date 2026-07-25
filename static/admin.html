@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=11">
+    <link rel="stylesheet" href="/static/admin.css?v=12">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -133,6 +133,14 @@
                             </div>
                             <span class="stat-num" id="total-referrals">0</span>
                             <span class="stat-label">Referrals</span>
+                        </div>
+                        <div class="stat-card stat-card-live">
+                            <div class="stat-card-header">
+                                <span class="stat-icon live-icon">&#128994;</span>
+                                <span class="stat-trend up"><span class="live-dot-sm"></span> Live</span>
+                            </div>
+                            <span class="stat-num" id="live-users-count">0</span>
+                            <span class="stat-label">Online Now</span>
                         </div>
                         <div class="stat-card">
                             <div class="stat-card-header">
@@ -774,6 +782,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=11"></script>
+    <script src="/static/admin.js?v=12"></script>
 </body>
 </html>

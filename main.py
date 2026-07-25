@@ -64,6 +64,8 @@ from database import (
     get_login_log_stats,
     cleanup_old_login_logs,
     update_last_active,
+    update_last_seen,
+    get_live_users_count,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -245,6 +247,7 @@ async def track_user(request: Request):
                            device_platform, user_agent, failure_reason)
 
     await update_last_active(user_id)
+    await update_last_seen(user_id)
 
     # VPN soft warning — return flag instead of hard block
     vpn_setting = await get_admin_setting("vpn_blocker")
@@ -275,6 +278,16 @@ async def tool_use(request: Request):
         _ad_start_times[user_id] = time.time()
         return {"status": "ok"}
     return {"status": "error", "message": "user_id required"}
+
+
+@app.post("/api/user/heartbeat")
+async def user_heartbeat(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    if not user_id:
+        return {"status": "error", "message": "user_id required"}
+    await update_last_seen(user_id)
+    return {"status": "ok"}
 
 
 @app.get("/api/stats")
@@ -420,6 +433,16 @@ async def admin_stats(request: Request):
         "pending_payout_amount": withdrawal_stats["pending"]["amount"],
         "fraud_alerts": fraud_stats["high"],
     }
+
+
+@app.get("/api/admin/live-users-count")
+async def admin_live_users_count(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    count = await get_live_users_count(2)
+    return {"live_users": count}
 
 
 @app.get("/api/admin/rates")

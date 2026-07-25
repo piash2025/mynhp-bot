@@ -49,6 +49,11 @@ async def init_db():
         except Exception:
             pass
 
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
+        except Exception:
+            pass
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ad_rates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -853,6 +858,22 @@ async def update_last_active(user_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("UPDATE users SET last_active = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
         await db.commit()
+
+
+async def update_last_seen(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+
+async def get_live_users_count(minutes: int = 2) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COUNT(*) FROM users WHERE last_seen >= datetime('now', ?)",
+            (f"-{minutes} minutes",)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
 
 
 async def get_session_id(user_id: int) -> Optional[str]:

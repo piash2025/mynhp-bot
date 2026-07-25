@@ -76,6 +76,8 @@ async function loadDashboard() {
     loadReferralSummary();
     loadReferrals();
     loadLoginLogs(1);
+    loadLiveCount();
+    setInterval(loadLiveCount, 15000);
 }
 
 async function loadStats() {
@@ -106,6 +108,17 @@ async function loadStats() {
             fraudTrend.innerHTML = '&#10003; Clean';
         }
     } catch (e) { /* ignore */ }
+}
+
+function loadLiveCount() {
+    fetch('/api/admin/live-users-count?password=' + adminToken)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) return;
+            var el = document.getElementById('live-users-count');
+            if (el) el.textContent = data.live_users || 0;
+        })
+        .catch(function() {});
 }
 
 // ===== SIDEBAR TOGGLE =====
