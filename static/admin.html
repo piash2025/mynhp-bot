@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=13">
+    <link rel="stylesheet" href="/static/admin.css?v=14">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -87,6 +87,10 @@
                     <a class="sidebar-item" data-tab="tasks" onclick="switchAdminTab('tasks')">
                         <span class="sidebar-icon">&#9989;</span>
                         <span class="sidebar-label">Task Activities</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="accounting" onclick="switchAdminTab('accounting')">
+                        <span class="sidebar-icon">&#128179;</span>
+                        <span class="sidebar-label">Accounting</span>
                     </a>
                 </nav>
 
@@ -703,6 +707,62 @@
                             <button onclick="loadTaskActivities(taskActivitiesPage + 1)" id="ts-next-page">Next &#9654;</button>
                         </div>
                     </div>
+
+                    <!-- Accounting Tab -->
+                    <div class="admin-panel" id="panel-accounting">
+                        <h2>&#128179; Finance & Accounting</h2>
+
+                        <div class="acct-stats">
+                            <div class="ts-stat">
+                                <span class="ts-stat-num" id="acct-revenue">0.0000</span>
+                                <span class="ts-stat-label">Total Revenue</span>
+                            </div>
+                            <div class="ts-stat loss">
+                                <span class="ts-stat-num" id="acct-payouts">0.0000</span>
+                                <span class="ts-stat-label">Total Payouts</span>
+                            </div>
+                            <div class="ts-stat completed">
+                                <span class="ts-stat-num" id="acct-profit">0.0000</span>
+                                <span class="ts-stat-label">Net Profit</span>
+                            </div>
+                            <div class="ts-stat warn">
+                                <span class="ts-stat-num" id="acct-liability">0.0000</span>
+                                <span class="ts-stat-label">Pending Liability</span>
+                            </div>
+                        </div>
+
+                        <div class="search-bar-row">
+                            <select id="acct-date-filter" onchange="loadAccounting(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:13px;">
+                                <option value="">All Time</option>
+                                <option value="today">Today</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                            <button class="export-csv-btn" onclick="exportAccountingCSV()">&#128229; Export CSV</button>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Type</th>
+                                        <th>Source</th>
+                                        <th>User ID</th>
+                                        <th>Amount</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="accounting-table"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="pagination">
+                            <button onclick="loadAccounting(accountingPage - 1)" id="acct-prev-page">&#9664; Prev</button>
+                            <span id="acct-page-info">Page 1</span>
+                            <button onclick="loadAccounting(accountingPage + 1)" id="acct-next-page">Next &#9654;</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -840,6 +900,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=13"></script>
+    <script src="/static/admin.js?v=14"></script>
 </body>
 </html>

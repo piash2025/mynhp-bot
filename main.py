@@ -69,6 +69,9 @@ from database import (
     create_task_activity,
     get_task_activities,
     get_task_activity_stats,
+    create_transaction,
+    get_accounting_summary,
+    get_transactions,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -366,6 +369,14 @@ async def update_user_balance(request: Request):
             ip_address=ip or "",
         )
 
+        await create_transaction(
+            txn_type="EXPENSE",
+            source=f"Reward: {platform_name or 'Unknown'}",
+            amount=reward,
+            user_id=user_id,
+            status="COMPLETED",
+        )
+
         user = await get_user(user_id)
         if user:
             return {
@@ -590,6 +601,15 @@ async def admin_approve_withdrawal(withdrawal_id: int, request: Request):
 
     note = data.get("note", "Approved by admin")
     await update_withdrawal_status(withdrawal_id, "approved", note)
+    withdrawal = await get_withdrawal(withdrawal_id)
+    if withdrawal:
+        await create_transaction(
+            txn_type="EXPENSE",
+            source=f"Withdrawal: {withdrawal.get('username', '') or withdrawal.get('user_id', '')}",
+            amount=withdrawal.get("amount", 0),
+            user_id=withdrawal.get("user_id", 0),
+            status="COMPLETED",
+        )
     return {"status": "ok"}
 
 
@@ -946,6 +966,24 @@ async def admin_task_activities(request: Request):
     stats = await get_task_activity_stats()
     result["stats"] = stats
     return result
+
+
+# ===== ACCOUNTING API =====
+
+@app.get("/api/admin/accounting")
+async def admin_accounting(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    date_filter = request.query_params.get("date_filter", "")
+    page = int(request.query_params.get("page", 1))
+
+    summary = await get_accounting_summary()
+    txns = await get_transactions(page=page, date_filter=date_filter)
+
+    return {**summary, **txns}
 
 
 if __name__ == "__main__":

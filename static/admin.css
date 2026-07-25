@@ -627,6 +627,13 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .ts-stat.reward .ts-stat-num { color: var(--blue); }
 .ts-stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; }
 
+/* ===== ACCOUNTING 4-CARD STATS ===== */
+.acct-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.acct-stats .ts-stat.loss { border-color: rgba(239,68,68,0.3); }
+.acct-stats .ts-stat.loss .ts-stat-num { color: #ef4444; }
+.acct-stats .ts-stat.warn { border-color: rgba(245,158,11,0.3); }
+.acct-stats .ts-stat.warn .ts-stat-num { color: #f59e0b; }
+
 /* ===== LOGIN LOG STATS ===== */
 .login-log-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
 .ll-stat { background: var(--bg2); border-radius: 10px; padding: 14px; text-align: center; border: 1px solid var(--border); }
@@ -737,6 +744,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     .ref-summary-cards { grid-template-columns: 1fr; }
     .chart-row { grid-template-columns: 1fr; }
     .platform-card { grid-template-columns: 1fr 1fr; }
+    .acct-stats { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 480px) {
@@ -748,4 +756,5 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     .pf-row { grid-template-columns: 1fr; }
     .search-bar-row { flex-direction: column; }
     .filter-bar { flex-wrap: wrap; }
+    .acct-stats { grid-template-columns: 1fr; }
 }

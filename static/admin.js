@@ -154,7 +154,8 @@ var tabTitles = {
     users: 'User Management',
     referrals: 'Referral System',
     loginlogs: 'Login Logs & Session Audit',
-    tasks: 'Task Activity Log'
+    tasks: 'Task Activity Log',
+    accounting: 'Finance & Accounting'
 };
 
 function switchAdminTab(tab) {
@@ -172,6 +173,7 @@ function switchAdminTab(tab) {
     }
     if (tab === 'loginlogs') loadLoginLogs(loginLogsPage);
     if (tab === 'tasks') loadTaskActivities(taskActivitiesPage);
+    if (tab === 'accounting') loadAccounting(accountingPage);
 }
 
 // ===== AD RATES =====
@@ -1232,6 +1234,67 @@ function exportTaskActivitiesCSV() {
             downloadCSV('task_activities_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
             showToast('Task activities exported!', 'success');
         });
+    } catch (e) { showToast('Export failed', 'error'); }
+}
+
+// ===== ACCOUNTING =====
+var accountingPage = 1;
+
+async function loadAccounting(page) {
+    accountingPage = page || 1;
+    var dateFilter = document.getElementById('acct-date-filter') ? document.getElementById('acct-date-filter').value : '';
+    try {
+        var resp = await fetch('/api/admin/accounting?password=' + adminToken + '&page=' + accountingPage + '&date_filter=' + dateFilter);
+        var data = await resp.json();
+        if (data.error) return;
+
+        document.getElementById('acct-revenue').textContent = data.total_revenue.toFixed(4);
+        document.getElementById('acct-payouts').textContent = data.total_payouts.toFixed(4);
+        document.getElementById('acct-profit').textContent = data.net_profit.toFixed(4);
+        document.getElementById('acct-liability').textContent = data.pending_liability.toFixed(4);
+
+        var tbody = document.getElementById('accounting-table');
+        if (!data.txns || data.txns.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px;">No transactions found</td></tr>';
+        } else {
+            tbody.innerHTML = data.txns.map(function(t) {
+                var typeClass = t.type === 'INCOME' ? 'status-accepted' : 'status-rejected';
+                var statusClass = t.status === 'COMPLETED' ? 'status-accepted' : t.status === 'PENDING' ? 'status-pending' : 'status-rejected';
+                return '<tr>' +
+                    '<td>' + formatDate(t.timestamp) + '</td>' +
+                    '<td><span class="status-badge ' + typeClass + '">' + t.type + '</span></td>' +
+                    '<td>' + t.source + '</td>' +
+                    '<td>' + (t.user_id || '-') + '</td>' +
+                    '<td>' + t.amount.toFixed(4) + '</td>' +
+                    '<td><span class="status-badge ' + statusClass + '">' + t.status + '</span></td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        document.getElementById('acct-page-info').textContent = 'Page ' + accountingPage + ' of ' + data.pages;
+        document.getElementById('acct-prev-page').disabled = accountingPage <= 1;
+        document.getElementById('acct-next-page').disabled = accountingPage >= data.pages;
+    } catch (e) { /* ignore */ }
+}
+
+async function exportAccountingCSV() {
+    try {
+        var dateFilter = document.getElementById('acct-date-filter') ? document.getElementById('acct-date-filter').value : '';
+        var resp = await fetch('/api/admin/accounting?password=' + adminToken + '&page=1&date_filter=' + dateFilter);
+        var data = await resp.json();
+        if (!data.txns || data.txns.length === 0) { showToast('No data to export', 'error'); return; }
+        var csv = 'Timestamp,Type,Source,User ID,Amount,Status\n';
+        data.txns.forEach(function(t) {
+            csv += '"' + formatDate(t.timestamp) + '","' + t.type + '","' + t.source + '",' + (t.user_id || '') + ',' + t.amount.toFixed(4) + ',"' + t.status + '"\n';
+        });
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'accounting_report_' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('CSV exported successfully!', 'success');
     } catch (e) { showToast('Export failed', 'error'); }
 }
 

@@ -192,6 +192,21 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_task_activities_timestamp ON task_activities(timestamp)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_task_activities_platform ON task_activities(platform_name)")
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL DEFAULT 'EXPENSE',
+                source TEXT DEFAULT '',
+                amount REAL DEFAULT 0.0,
+                user_id INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'COMPLETED',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_transactions_type ON transactions(type)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_transactions_timestamp ON transactions(timestamp)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(status)")
+
         default_rates = [
             ("adsgream", 0.0005, 50, 1),
             ("monetag", 0.0005, 30, 1),
@@ -1035,3 +1050,57 @@ async def get_task_activity_stats() -> dict:
         async with db.execute("SELECT platform_name, COUNT(*) as cnt FROM task_activities WHERE status='COMPLETED' GROUP BY platform_name ORDER BY cnt DESC") as c:
             platforms = [{"name": r[0], "count": r[1]} for r in await c.fetchall()]
         return {"total": total, "completed": completed, "total_reward": total_reward, "platforms": platforms}
+
+
+# ===== TRANSACTIONS / ACCOUNTING =====
+
+async def create_transaction(txn_type: str, source: str, amount: float, user_id: int = 0, status: str = "COMPLETED"):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO transactions (type, source, amount, user_id, status)
+            VALUES (?, ?, ?, ?, ?)
+        """, (txn_type, source, amount, user_id, status))
+        await db.commit()
+
+
+async def get_accounting_summary() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='INCOME' AND status='COMPLETED'") as c:
+            total_income = (await c.fetchone())[0]
+        async with db.execute("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE type='EXPENSE' AND status='COMPLETED'") as c:
+            total_expense = (await c.fetchone())[0]
+        async with db.execute("SELECT COALESCE(SUM(balance), 0) FROM users") as c:
+            pending_liability = (await c.fetchone())[0]
+        return {
+            "total_revenue": total_income,
+            "total_payouts": total_expense,
+            "net_profit": total_income - total_expense,
+            "pending_liability": pending_liability,
+        }
+
+
+async def get_transactions(page: int = 1, per_page: int = 50, date_filter: str = "") -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        where_clauses = []
+        params = []
+
+        if date_filter == "today":
+            where_clauses.append("DATE(timestamp) = DATE('now')")
+        elif date_filter == "week":
+            where_clauses.append("timestamp >= datetime('now', '-7 days')")
+        elif date_filter == "month":
+            where_clauses.append("timestamp >= datetime('now', '-30 days')")
+
+        where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        count_query = f"SELECT COUNT(*) FROM transactions{where_sql}"
+        async with db.execute(count_query, params) as cursor:
+            total = (await cursor.fetchone())[0]
+
+        offset = (page - 1) * per_page
+        query = f"SELECT * FROM transactions{where_sql} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        async with db.execute(query, params + [per_page, offset]) as cursor:
+            rows = [dict(r) for r in await cursor.fetchall()]
+
+        return {"txns": rows, "total": total, "page": page, "per_page": per_page, "pages": max(1, -(-total // per_page))}
