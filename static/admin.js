@@ -1,4 +1,4 @@
-let adminToken = null;
+let adminToken = sessionStorage.getItem('adminToken') || null;
 let currentPage = 0;
 let allUsers = [];
 let currentWithdrawalFilter = '';
@@ -35,6 +35,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
         var data = await resp.json();
         if (data.status === 'ok') {
             adminToken = password;
+            sessionStorage.setItem('adminToken', password);
             document.getElementById('login-screen').classList.add('hidden');
             document.getElementById('admin-dashboard').classList.remove('hidden');
             loadDashboard();
@@ -51,6 +52,7 @@ document.getElementById('login-form').addEventListener('submit', async function(
 
 function logout() {
     adminToken = null;
+    sessionStorage.removeItem('adminToken');
     document.getElementById('admin-dashboard').classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('admin-password').value = '';
@@ -626,4 +628,24 @@ async function confirmDeletePlatform() {
         showToast('Error deleting platform', 'error');
     }
     deletingPlatformId = null;
+}
+
+// ===== AUTO-LOGIN ON RELOAD =====
+if (adminToken) {
+    fetch('/api/admin/stats?password=' + adminToken)
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+            if (!data.error) {
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('admin-dashboard').classList.remove('hidden');
+                loadDashboard();
+            } else {
+                sessionStorage.removeItem('adminToken');
+                adminToken = null;
+            }
+        })
+        .catch(function() {
+            sessionStorage.removeItem('adminToken');
+            adminToken = null;
+        });
 }
