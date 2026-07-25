@@ -59,6 +59,10 @@ from database import (
     flag_user,
     set_user_status,
     get_flagged_users,
+    create_login_log,
+    get_login_logs,
+    get_login_log_stats,
+    cleanup_old_login_logs,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -76,7 +80,21 @@ def check_admin(password: str) -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    import asyncio
+    async def weekly_login_log_cleanup():
+        while True:
+            await asyncio.sleep(7 * 24 * 3600)
+            try:
+                enabled = await get_admin_setting("login_log_cleanup_enabled")
+                if enabled == "1":
+                    deleted = await cleanup_old_login_logs(30)
+                    if deleted > 0:
+                        print(f"[cron] Clean up {deleted} old SUCCESS login logs")
+            except Exception as e:
+                print(f"[cron] Login log cleanup error: {e}")
+    task = asyncio.create_task(weekly_login_log_cleanup())
     yield
+    task.cancel()
 
 
 app = FastAPI(title="mynhp_bot", lifespan=lifespan)
@@ -174,9 +192,17 @@ async def track_user(request: Request):
     user_id = data.get("user_id")
     session_id = data.get("session_id", "")
     init_data = data.get("init_data", "")
+    device_platform = data.get("platform", "")
+    user_agent = request.headers.get("User-Agent", "")
 
     if not user_id:
         return {"status": "error", "message": "user_id required"}
+
+    ip = extract_ip(request)
+    is_vpn = False
+    location = ""
+    log_status = "SUCCESS"
+    failure_reason = ""
 
     # Silent Telegram initData hash verification
     initdata_check = await get_admin_setting("enable_initdata_check")
@@ -184,6 +210,9 @@ async def track_user(request: Request):
         verified_user = verify_telegram_initdata(init_data)
         if verified_user and verified_user.get("id"):
             user_id = verified_user["id"]
+        elif init_data:
+            log_status = "FAILED"
+            failure_reason = "Invalid initData hash"
 
     await add_or_update_user(
         user_id, data.get("username"), data.get("first_name")
@@ -191,12 +220,11 @@ async def track_user(request: Request):
     if session_id:
         await update_session_id(user_id, session_id)
 
-    ip = extract_ip(request)
-    is_vpn = False
     if ip:
         geo = await get_geo_info(ip)
         await update_user_ip(user_id, ip, geo["country"], geo["city"], geo["is_vpn"])
         is_vpn = geo["is_vpn"]
+        location = f"{geo['city']}, {geo['country']}".strip(", ")
         if geo["is_vpn"]:
             user = await get_user(user_id)
             uname = user.get("username", "") if user else ""
@@ -205,7 +233,15 @@ async def track_user(request: Request):
 
     user = await get_user(user_id)
     if user and user.get("is_banned"):
+        failure_reason = "Account banned"
+        await create_login_log(user_id, data.get("username", ""), data.get("first_name", ""),
+                               "FAILED", "telegram_initdata", ip, location, is_vpn,
+                               device_platform, user_agent, failure_reason)
         return BANNED_RESPONSE
+
+    await create_login_log(user_id, data.get("username", ""), data.get("first_name", ""),
+                           log_status, "telegram_initdata", ip, location, is_vpn,
+                           device_platform, user_agent, failure_reason)
 
     # VPN soft warning — return flag instead of hard block
     vpn_setting = await get_admin_setting("vpn_blocker")
@@ -806,6 +842,44 @@ async def admin_fraud_ip_groups(request: Request):
     groups = await get_fraud_ip_groups()
     vpn_users = await get_vpn_users()
     return {"ip_groups": groups, "vpn_users": vpn_users}
+
+
+# ===== LOGIN LOGS =====
+
+@app.get("/api/admin/login-logs")
+async def admin_login_logs(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    page = int(request.query_params.get("page", 1))
+    per_page = int(request.query_params.get("per_page", 50))
+    search = request.query_params.get("search", "")
+    status_filter = request.query_params.get("status", "")
+    vpn_filter = request.query_params.get("vpn", "")
+
+    result = await get_login_logs(page, per_page, search, status_filter, vpn_filter)
+    stats = await get_login_log_stats()
+    result["stats"] = stats
+    result["cleanup_enabled"] = (await get_admin_setting("login_log_cleanup_enabled")) == "1"
+    return result
+
+
+@app.post("/api/admin/login-logs/cleanup")
+async def admin_login_logs_cleanup(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    enabled = data.get("enabled")
+    if enabled is not None:
+        await set_admin_setting("login_log_cleanup_enabled", "1" if enabled else "0")
+
+    deleted = await cleanup_old_login_logs(30)
+    return {"status": "ok", "deleted": deleted}
 
 
 if __name__ == "__main__":

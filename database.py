@@ -142,6 +142,28 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS login_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                username TEXT DEFAULT '',
+                first_name TEXT DEFAULT '',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'SUCCESS',
+                auth_method TEXT DEFAULT 'telegram_initdata',
+                ip_address TEXT DEFAULT '',
+                location TEXT DEFAULT '',
+                is_vpn INTEGER DEFAULT 0,
+                device_platform TEXT DEFAULT '',
+                user_agent TEXT DEFAULT '',
+                failure_reason TEXT DEFAULT ''
+            )
+        """)
+
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_login_logs_user_id ON login_logs(user_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_login_logs_timestamp ON login_logs(timestamp)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_login_logs_status ON login_logs(status)")
+
         default_rates = [
             ("adsgream", 0.0005, 50, 1),
             ("monetag", 0.0005, 30, 1),
@@ -168,6 +190,7 @@ async def init_db():
             "enable_single_device_login": "0",
             "enable_strict_timer": "1",
             "auto_block_enabled": "0",
+            "login_log_cleanup_enabled": "1",
         }
         for key, value in defaults.items():
             await db.execute("""
@@ -816,3 +839,74 @@ async def verify_session(user_id: int, session_id: str) -> bool:
     if not stored:
         return True
     return stored == session_id
+
+
+# ===== LOGIN LOGS =====
+
+async def create_login_log(user_id: int, username: str = "", first_name: str = "",
+                           status: str = "SUCCESS", auth_method: str = "telegram_initdata",
+                           ip_address: str = "", location: str = "", is_vpn: bool = False,
+                           device_platform: str = "", user_agent: str = "", failure_reason: str = ""):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO login_logs (user_id, username, first_name, status, auth_method,
+                                    ip_address, location, is_vpn, device_platform, user_agent, failure_reason)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, username, first_name, status, auth_method,
+              ip_address, location, 1 if is_vpn else 0, device_platform, user_agent, failure_reason))
+        await db.commit()
+
+
+async def get_login_logs(page: int = 1, per_page: int = 50, search: str = "",
+                         status_filter: str = "", vpn_filter: str = "") -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        where_clauses = []
+        params = []
+
+        if search:
+            where_clauses.append("(user_id = ? OR username LIKE ? OR first_name LIKE ? OR ip_address = ?)")
+            params.extend([search, f"%{search}%", f"%{search}%", search])
+        if status_filter:
+            where_clauses.append("status = ?")
+            params.append(status_filter)
+        if vpn_filter == "1":
+            where_clauses.append("is_vpn = 1")
+        elif vpn_filter == "0":
+            where_clauses.append("is_vpn = 0")
+
+        where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        count_query = f"SELECT COUNT(*) FROM login_logs{where_sql}"
+        async with db.execute(count_query, params) as cursor:
+            total = (await cursor.fetchone())[0]
+
+        offset = (page - 1) * per_page
+        query = f"SELECT * FROM login_logs{where_sql} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        async with db.execute(query, params + [per_page, offset]) as cursor:
+            rows = [dict(r) for r in await cursor.fetchall()]
+
+        return {"logs": rows, "total": total, "page": page, "per_page": per_page, "pages": max(1, -(-total // per_page))}
+
+
+async def get_login_log_stats() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COUNT(*) FROM login_logs") as c:
+            total = (await c.fetchone())[0]
+        async with db.execute("SELECT COUNT(*) FROM login_logs WHERE status='SUCCESS'") as c:
+            success = (await c.fetchone())[0]
+        async with db.execute("SELECT COUNT(*) FROM login_logs WHERE status='FAILED'") as c:
+            failed = (await c.fetchone())[0]
+        async with db.execute("SELECT COUNT(*) FROM login_logs WHERE is_vpn=1") as c:
+            vpn = (await c.fetchone())[0]
+        return {"total": total, "success": success, "failed": failed, "vpn": vpn}
+
+
+async def cleanup_old_login_logs(days: int = 30) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            "DELETE FROM login_logs WHERE status = 'SUCCESS' AND timestamp < datetime('now', ?)",
+            (f"-{days} days",)
+        )
+        await db.commit()
+        return cursor.rowcount

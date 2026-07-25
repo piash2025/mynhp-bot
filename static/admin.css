@@ -582,6 +582,18 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 
 .hidden { display: none !important; }
 
+/* ===== LOGIN LOG STATS ===== */
+.login-log-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
+.ll-stat { background: var(--bg2); border-radius: 10px; padding: 14px; text-align: center; border: 1px solid var(--border); }
+.ll-stat.success { border-color: rgba(16,185,129,0.3); }
+.ll-stat.failed { border-color: rgba(239,68,68,0.3); }
+.ll-stat.vpn { border-color: rgba(59,130,246,0.3); }
+.ll-stat-num { display: block; font-size: 22px; font-weight: 700; margin-bottom: 2px; }
+.ll-stat.success .ll-stat-num { color: var(--accent); }
+.ll-stat.failed .ll-stat-num { color: var(--danger); }
+.ll-stat.vpn .ll-stat-num { color: var(--blue); }
+.ll-stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; }
+
 /* ===== DASHBOARD ===== */
 .dash-summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 24px; }
 .dash-card { background: var(--bg2); border-radius: 12px; padding: 18px 14px; text-align: center; border: 1px solid var(--border); position: relative; overflow: hidden; }

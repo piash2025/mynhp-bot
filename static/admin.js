@@ -75,6 +75,7 @@ async function loadDashboard() {
     await loadDashboardCharts();
     loadReferralSummary();
     loadReferrals();
+    loadLoginLogs(1);
 }
 
 async function loadStats() {
@@ -137,7 +138,8 @@ var tabTitles = {
     fraud: 'Fraud Detection & Anti-Cheat',
     settings: 'Bot Settings',
     users: 'User Management',
-    referrals: 'Referral System'
+    referrals: 'Referral System',
+    loginlogs: 'Login Logs & Session Audit'
 };
 
 function switchAdminTab(tab) {
@@ -153,6 +155,7 @@ function switchAdminTab(tab) {
         sb.classList.remove('mobile-open');
         ov.classList.remove('active');
     }
+    if (tab === 'loginlogs') loadLoginLogs(loginLogsPage);
 }
 
 // ===== AD RATES =====
@@ -1008,6 +1011,93 @@ function exportUsersCSV() {
             var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
             downloadCSV('users_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
             showToast('Users exported!', 'success');
+        });
+    } catch (e) { showToast('Export failed', 'error'); }
+}
+
+// ===== LOGIN LOGS =====
+var loginLogsPage = 1;
+var loginLogsDebounce = null;
+
+function loadLoginLogs(page) {
+    page = page || 1;
+    if (page < 1) return;
+    loginLogsPage = page;
+    var search = document.getElementById('loginlog-search') ? document.getElementById('loginlog-search').value : '';
+    var statusFilter = document.getElementById('loginlog-status-filter') ? document.getElementById('loginlog-status-filter').value : '';
+    var vpnFilter = document.getElementById('loginlog-vpn-filter') ? document.getElementById('loginlog-vpn-filter').value : '';
+
+    fetch('/api/admin/login-logs?password=' + adminToken + '&page=' + page + '&per_page=50&search=' + encodeURIComponent(search) + '&status=' + statusFilter + '&vpn=' + vpnFilter)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { showToast(data.error, 'error'); return; }
+
+            var stats = data.stats || {};
+            document.getElementById('ll-total').textContent = stats.total || 0;
+            document.getElementById('ll-success').textContent = stats.success || 0;
+            document.getElementById('ll-failed').textContent = stats.failed || 0;
+            document.getElementById('ll-vpn').textContent = stats.vpn || 0;
+
+            var cleanupToggle = document.getElementById('set-log-cleanup');
+            if (cleanupToggle) cleanupToggle.checked = data.cleanup_enabled;
+
+            var tbody = document.getElementById('loginlogs-table');
+            tbody.innerHTML = '';
+            var logs = data.logs || [];
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text2);">No login logs found</td></tr>';
+            } else {
+                logs.forEach(function(log) {
+                    var statusClass = log.status === 'SUCCESS' ? 'badge-approved' : 'badge-rejected';
+                    var vpnBadge = log.is_vpn ? '<span class="badge badge-rejected">VPN</span>' : '<span style="color:var(--text2);">-</span>';
+                    tbody.innerHTML += '<tr>' +
+                        '<td style="white-space:nowrap;font-size:12px;">' + (log.timestamp || '') + '</td>' +
+                        '<td><strong>' + (log.user_id || '') + '</strong><br><span style="color:var(--text2);font-size:11px;">' + (log.username || log.first_name || '') + '</span></td>' +
+                        '<td><code style="font-size:12px;background:var(--bg);padding:2px 6px;border-radius:4px;">' + (log.ip_address || '-') + '</code></td>' +
+                        '<td style="font-size:12px;">' + (log.location || '-') + '</td>' +
+                        '<td><span style="font-size:11px;text-transform:uppercase;color:var(--text2);">' + (log.device_platform || '-') + '</span></td>' +
+                        '<td>' + vpnBadge + '</td>' +
+                        '<td><span class="badge ' + statusClass + '">' + (log.status || '') + '</span>' +
+                        (log.failure_reason ? '<br><span style="font-size:10px;color:var(--danger);">' + log.failure_reason + '</span>' : '') + '</td>' +
+                        '</tr>';
+                });
+            }
+
+            document.getElementById('ll-page-info').textContent = 'Page ' + data.page + ' of ' + data.pages;
+            document.getElementById('ll-prev-page').disabled = data.page <= 1;
+            document.getElementById('ll-next-page').disabled = data.page >= data.pages;
+        });
+}
+
+function searchLoginLogs() {
+    clearTimeout(loginLogsDebounce);
+    loginLogsDebounce = setTimeout(function() { loadLoginLogs(1); }, 300);
+}
+
+function toggleLogCleanup(enabled) {
+    fetch('/api/admin/login-logs/cleanup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({password: adminToken, enabled: enabled})
+    }).then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('Cleanup ' + (enabled ? 'enabled' : 'disabled') + '. Deleted ' + (data.deleted || 0) + ' old logs.', 'success');
+    });
+}
+
+function exportLoginLogsCSV() {
+    try {
+        fetch('/api/admin/login-logs?password=' + adminToken + '&page=1&per_page=10000')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var rows = [['Timestamp', 'User ID', 'Username', 'First Name', 'Status', 'Auth Method', 'IP Address', 'Location', 'VPN', 'Platform', 'User Agent', 'Failure Reason']];
+            (data.logs || []).forEach(function(l) {
+                rows.push([l.timestamp||'', l.user_id||'', l.username||'', l.first_name||'', l.status||'', l.auth_method||'', l.ip_address||'', l.location||'', l.is_vpn?'Yes':'No', l.device_platform||'', l.user_agent||'', l.failure_reason||'']);
+            });
+            var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
+            downloadCSV('login_logs_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
+            showToast('Login logs exported!', 'success');
         });
     } catch (e) { showToast('Export failed', 'error'); }
 }

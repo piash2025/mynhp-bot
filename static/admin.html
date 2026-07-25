@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=9">
+    <link rel="stylesheet" href="/static/admin.css?v=10">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -79,6 +79,10 @@
                     <a class="sidebar-item" data-tab="referrals" onclick="switchAdminTab('referrals')">
                         <span class="sidebar-icon">&#128640;</span>
                         <span class="sidebar-label">Referrals</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="loginlogs" onclick="switchAdminTab('loginlogs')">
+                        <span class="sidebar-icon">&#128214;</span>
+                        <span class="sidebar-label">Login Logs</span>
                     </a>
                 </nav>
 
@@ -548,6 +552,82 @@
                             </table>
                         </div>
                     </div>
+
+                    <!-- Login Logs Tab -->
+                    <div class="admin-panel" id="panel-loginlogs">
+                        <h2>&#128214; Login Logs & Session Audit</h2>
+                        <p class="panel-desc">Track all authentication attempts and session activity</p>
+
+                        <div class="login-log-stats">
+                            <div class="ll-stat">
+                                <span class="ll-stat-num" id="ll-total">0</span>
+                                <span class="ll-stat-label">Total Logs</span>
+                            </div>
+                            <div class="ll-stat success">
+                                <span class="ll-stat-num" id="ll-success">0</span>
+                                <span class="ll-stat-label">Success</span>
+                            </div>
+                            <div class="ll-stat failed">
+                                <span class="ll-stat-num" id="ll-failed">0</span>
+                                <span class="ll-stat-label">Failed</span>
+                            </div>
+                            <div class="ll-stat vpn">
+                                <span class="ll-stat-num" id="ll-vpn">0</span>
+                                <span class="ll-stat-label">VPN Users</span>
+                            </div>
+                        </div>
+
+                        <div class="fraud-settings" style="margin-bottom:16px;">
+                            <div class="toggle-row">
+                                <div>
+                                    <span class="toggle-label">Auto-cleanup old SUCCESS logs (30+ days)</span>
+                                    <small class="setting-desc">Runs weekly, deletes old successful login logs to save space</small>
+                                </div>
+                                <label class="toggle">
+                                    <input type="checkbox" id="set-log-cleanup" onchange="toggleLogCleanup(this.checked)">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="search-bar-row">
+                            <input type="text" id="loginlog-search" placeholder="&#128269; Search by User ID, username, or IP..." oninput="searchLoginLogs()">
+                            <select id="loginlog-status-filter" onchange="loadLoginLogs(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:13px;">
+                                <option value="">All Status</option>
+                                <option value="SUCCESS">SUCCESS</option>
+                                <option value="FAILED">FAILED</option>
+                            </select>
+                            <select id="loginlog-vpn-filter" onchange="loadLoginLogs(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:13px;">
+                                <option value="">All VPN</option>
+                                <option value="1">VPN Only</option>
+                                <option value="0">Non-VPN</option>
+                            </select>
+                            <button class="export-csv-btn" onclick="exportLoginLogsCSV()">&#128229; Export CSV</button>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User</th>
+                                        <th>IP Address</th>
+                                        <th>Location</th>
+                                        <th>Platform</th>
+                                        <th>VPN</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="loginlogs-table"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="pagination">
+                            <button onclick="loadLoginLogs(loginLogsPage - 1)" id="ll-prev-page">&#9664; Prev</button>
+                            <span id="ll-page-info">Page 1</span>
+                            <button onclick="loadLoginLogs(loginLogsPage + 1)" id="ll-next-page">Next &#9654;</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -685,6 +765,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=9"></script>
+    <script src="/static/admin.js?v=10"></script>
 </body>
 </html>
