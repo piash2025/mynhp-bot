@@ -275,12 +275,13 @@
                         <div class="setting-item">
                             <label>VPN/Proxy Blocker</label>
                             <div class="toggle-row">
-                                <span class="toggle-label">Block VPN users</span>
-                                <div class="toggle">
+                                <span class="toggle-label" id="vpn-blocker-label">OFF</span>
+                                <label class="toggle">
                                     <input type="checkbox" id="set-vpn-blocker" onchange="toggleFraudSetting(this)">
                                     <span class="slider"></span>
-                                </div>
+                                </label>
                             </div>
+                            <small style="color:var(--text2);font-size:11px;display:block;margin-top:6px;">When ON: VPN users are blocked from using the app</small>
                         </div>
                         <div class="setting-item">
                             <label>Max Ads Per Minute</label>
@@ -550,10 +551,10 @@
                         <label>Status</label>
                         <div class="toggle-row">
                             <span class="toggle-label">Active</span>
-                            <div class="toggle">
+                            <label class="toggle">
                                 <input type="checkbox" id="pf-enabled" checked>
                                 <span class="slider"></span>
-                            </div>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -582,6 +583,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=6"></script>
+    <script src="/static/admin.js?v=7"></script>
 </body>
 </html>

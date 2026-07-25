@@ -132,9 +132,9 @@ async function loadRates() {
                 '<input type="number" step="0.000001" value="' + rate.rate + '" data-network="' + rate.network + '" data-field="rate"></div>' +
                 '<div><label>Daily Limit</label>' +
                 '<input type="number" value="' + rate.daily_limit + '" data-network="' + rate.network + '" data-field="daily_limit"></div>' +
-                '<div><label>Enabled</label><div class="toggle">' +
+                '<div><label>Enabled</label><label class="toggle">' +
                 '<input type="checkbox" ' + (rate.enabled ? 'checked' : '') + ' data-network="' + rate.network + '" data-field="enabled" onchange="toggleRate(this)">' +
-                '<span class="slider"></span></div></div></div>';
+                '<span class="slider"></span></label></div></div>';
         });
     } catch (e) { /* ignore */ }
 }
@@ -423,7 +423,13 @@ function loadFraudSettings() {
     fetch('/api/admin/settings?password=' + adminToken)
         .then(function(r) { return r.json(); })
         .then(function(settings) {
-            document.getElementById('set-vpn-blocker').checked = settings.vpn_blocker === '1';
+            var vpnOn = settings.vpn_blocker === '1';
+            document.getElementById('set-vpn-blocker').checked = vpnOn;
+            var label = document.getElementById('vpn-blocker-label');
+            if (label) {
+                label.textContent = vpnOn ? 'ON' : 'OFF';
+                label.style.color = vpnOn ? 'var(--accent)' : 'var(--text)';
+            }
             document.getElementById('set-max-ads-minute').value = settings.max_ads_per_minute || 10;
             document.getElementById('set-max-daily-withdrawals').value = settings.max_daily_withdrawals || 3;
         })
@@ -431,21 +437,32 @@ function loadFraudSettings() {
 }
 
 function toggleFraudSetting(checkbox) {
-    checkbox.value = checkbox.checked ? 1 : 0;
+    var label = document.getElementById('vpn-blocker-label');
+    if (label) label.textContent = checkbox.checked ? 'ON' : 'OFF';
+    if (label) label.style.color = checkbox.checked ? 'var(--accent)' : 'var(--text)';
 }
 
 async function saveFraudSettings() {
-    await fetch('/api/admin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            password: adminToken,
-            vpn_blocker: document.getElementById('set-vpn-blocker').checked ? '1' : '0',
-            max_ads_per_minute: document.getElementById('set-max-ads-minute').value,
-            max_daily_withdrawals: document.getElementById('set-max-daily-withdrawals').value,
-        }),
-    });
-    showToast('Fraud settings saved!', 'success');
+    try {
+        var resp = await fetch('/api/admin/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                password: adminToken,
+                vpn_blocker: document.getElementById('set-vpn-blocker').checked ? '1' : '0',
+                max_ads_per_minute: document.getElementById('set-max-ads-minute').value,
+                max_daily_withdrawals: document.getElementById('set-max-daily-withdrawals').value,
+            }),
+        });
+        var data = await resp.json();
+        if (data.status === 'ok') {
+            showToast('Fraud settings saved!', 'success');
+        } else {
+            showToast('Failed to save settings', 'error');
+        }
+    } catch (e) {
+        showToast('Failed to save settings', 'error');
+    }
 }
 
 // ===== FRAUD IP GROUPS =====
@@ -696,9 +713,9 @@ async function loadPlatforms() {
                 '</div>' +
                 '<div><label>Reward</label><input type="number" step="0.000001" value="' + p.rate + '" data-id="' + p.id + '" data-field="rate"></div>' +
                 '<div><label>Daily Limit</label><input type="number" value="' + p.daily_limit + '" data-id="' + p.id + '" data-field="daily_limit"></div>' +
-                '<div><label>Status</label><div class="toggle">' +
+                '<div><label>Status</label><label class="toggle">' +
                 '<input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' data-id="' + p.id + '" data-field="enabled">' +
-                '<span class="slider"></span></div></div>' +
+                '<span class="slider"></span></label></div>' +
                 '<div class="platform-actions">' +
                 '<button class="btn-edit" onclick="editPlatform(' + p.id + ')">&#9998; Edit</button>' +
                 '<button class="btn-delete" onclick="deletePlatform(' + p.id + ', \'' + p.name.replace(/'/g, "\\'") + '\')">&#128465; Delete</button>' +
