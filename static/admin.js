@@ -1298,6 +1298,111 @@ async function exportAccountingCSV() {
     } catch (e) { showToast('Export failed', 'error'); }
 }
 
+// ===== ACCOUNTING SUB-TABS =====
+var currentAcctTab = 'ledger';
+
+function switchAcctTab(tab) {
+    currentAcctTab = tab;
+    document.getElementById('acct-tab-ledger').classList.toggle('active', tab === 'ledger');
+    document.getElementById('acct-tab-users').classList.toggle('active', tab === 'users');
+    document.getElementById('acct-sub-ledger').classList.toggle('hidden', tab !== 'ledger');
+    document.getElementById('acct-sub-users').classList.toggle('hidden', tab !== 'users');
+    if (tab === 'users') loadUserAccounting(1);
+}
+
+// ===== USER ACCOUNTING =====
+var userAcctPage = 1;
+var _userAcctSearchTimer = null;
+
+async function loadUserAccounting(page) {
+    userAcctPage = page || 1;
+    var search = document.getElementById('acct-user-search') ? document.getElementById('acct-user-search').value.trim() : '';
+    try {
+        var resp = await fetch('/api/admin/accounting/users?password=' + adminToken + '&page=' + userAcctPage + '&search=' + encodeURIComponent(search));
+        var data = await resp.json();
+        if (data.error) return;
+
+        var tbody = document.getElementById('acct-users-table');
+        if (!data.users || data.users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px;">No users found</td></tr>';
+        } else {
+            tbody.innerHTML = data.users.map(function(u) {
+                var balColor = u.current_balance > 0 ? 'color:var(--accent);' : '';
+                var pendingColor = u.pending_withdrawal > 0 ? 'color:#f59e0b;' : '';
+                return '<tr>' +
+                    '<td><strong>#' + u.user_id + '</strong><br><span style="color:var(--text2);font-size:12px;">' + (u.username ? '@' + u.username : u.first_name || '-') + '</span></td>' +
+                    '<td style="color:var(--accent);font-weight:600;">' + (u.total_earned || 0).toFixed(4) + '</td>' +
+                    '<td style="color:#ef4444;">' + (u.total_withdrawn || 0).toFixed(4) + '</td>' +
+                    '<td style="' + pendingColor + '">' + (u.pending_withdrawal || 0).toFixed(4) + '</td>' +
+                    '<td style="' + balColor + 'font-weight:600;">' + (u.current_balance || 0).toFixed(4) + '</td>' +
+                    '<td style="font-size:12px;color:var(--text2);">' + (u.last_payout_date ? formatDate(u.last_payout_date) : 'Never') + '</td>' +
+                    '<td><button class="btn-edit" onclick="viewUserHistory(' + u.user_id + ', \'' + (u.username || u.first_name || '').replace(/'/g, "\\'") + '\')">&#128196; History</button></td>' +
+                    '</tr>';
+            }).join('');
+        }
+
+        document.getElementById('ua-page-info').textContent = 'Page ' + userAcctPage + ' of ' + data.pages;
+        document.getElementById('ua-prev-page').disabled = userAcctPage <= 1;
+        document.getElementById('ua-next-page').disabled = userAcctPage >= data.pages;
+    } catch (e) { /* ignore */ }
+}
+
+function searchUserAccounting() {
+    clearTimeout(_userAcctSearchTimer);
+    _userAcctSearchTimer = setTimeout(function() { loadUserAccounting(1); }, 300);
+}
+
+async function viewUserHistory(userId, name) {
+    document.getElementById('user-history-info').textContent = 'Transaction history for #' + userId + (name ? ' (@' + name + ')' : '');
+    var tbody = document.getElementById('user-history-table');
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px;">Loading...</td></tr>';
+    openModal('user-history-modal');
+
+    try {
+        var resp = await fetch('/api/admin/accounting/users/' + userId + '/history?password=' + adminToken);
+        var data = await resp.json();
+        if (data.error) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);">Error loading history</td></tr>'; return; }
+
+        if (!data.history || data.history.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px;">No transactions found</td></tr>';
+        } else {
+            tbody.innerHTML = data.history.map(function(t) {
+                var typeClass = t.type === 'EARNED' ? 'status-accepted' : 'status-rejected';
+                var statusClass = t.status === 'COMPLETED' || t.status === 'approved' ? 'status-accepted' : t.status === 'pending' ? 'status-pending' : 'status-rejected';
+                return '<tr>' +
+                    '<td>' + formatDate(t.timestamp) + '</td>' +
+                    '<td><span class="status-badge ' + typeClass + '">' + t.type + '</span></td>' +
+                    '<td>' + (t.source || '-') + '</td>' +
+                    '<td>' + t.amount.toFixed(4) + '</td>' +
+                    '<td><span class="status-badge ' + statusClass + '">' + (t.status || '-') + '</span></td>' +
+                    '</tr>';
+            }).join('');
+        }
+    } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);">Failed to load history</td></tr>';
+    }
+}
+
+async function exportUserAccountingCSV() {
+    try {
+        var resp = await fetch('/api/admin/accounting/users?password=' + adminToken + '&page=1&search=');
+        var data = await resp.json();
+        if (!data.users || data.users.length === 0) { showToast('No data to export', 'error'); return; }
+        var csv = 'User ID,Username,Total Earned,Total Withdrawn,Pending Payouts,Current Balance,Last Payout\n';
+        data.users.forEach(function(u) {
+            csv += u.user_id + ',' + (u.username || u.first_name || '') + ',' + (u.total_earned || 0).toFixed(4) + ',' + (u.total_withdrawn || 0).toFixed(4) + ',' + (u.pending_withdrawal || 0).toFixed(4) + ',' + (u.current_balance || 0).toFixed(4) + ',' + (u.last_payout_date || '') + '\n';
+        });
+        var blob = new Blob([csv], { type: 'text/csv' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'user_accounting_' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+        showToast('CSV exported successfully!', 'success');
+    } catch (e) { showToast('Export failed', 'error'); }
+}
+
 // ===== AUTH CHECK ON LOAD =====
 (function checkAuth() {
     var loader = document.getElementById('auth-loader');

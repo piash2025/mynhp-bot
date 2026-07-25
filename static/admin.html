@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=14">
+    <link rel="stylesheet" href="/static/admin.css?v=15">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -731,36 +731,76 @@
                             </div>
                         </div>
 
-                        <div class="search-bar-row">
-                            <select id="acct-date-filter" onchange="loadAccounting(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:13px;">
-                                <option value="">All Time</option>
-                                <option value="today">Today</option>
-                                <option value="week">This Week</option>
-                                <option value="month">This Month</option>
-                            </select>
-                            <button class="export-csv-btn" onclick="exportAccountingCSV()">&#128229; Export CSV</button>
+                        <!-- Sub-tabs -->
+                        <div class="filter-bar" style="margin-bottom:14px;">
+                            <button class="filter-btn active" id="acct-tab-ledger" onclick="switchAcctTab('ledger')">Transaction Ledger</button>
+                            <button class="filter-btn" id="acct-tab-users" onclick="switchAcctTab('users')">User Accounting</button>
                         </div>
 
-                        <div class="table-wrapper">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Timestamp</th>
-                                        <th>Type</th>
-                                        <th>Source</th>
-                                        <th>User ID</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="accounting-table"></tbody>
-                            </table>
+                        <!-- Ledger Sub-tab -->
+                        <div id="acct-sub-ledger">
+                            <div class="search-bar-row">
+                                <select id="acct-date-filter" onchange="loadAccounting(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:13px;">
+                                    <option value="">All Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">This Week</option>
+                                    <option value="month">This Month</option>
+                                </select>
+                                <button class="export-csv-btn" onclick="exportAccountingCSV()">&#128229; Export CSV</button>
+                            </div>
+
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Type</th>
+                                            <th>Source</th>
+                                            <th>User ID</th>
+                                            <th>Amount</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="accounting-table"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="pagination">
+                                <button onclick="loadAccounting(accountingPage - 1)" id="acct-prev-page">&#9664; Prev</button>
+                                <span id="acct-page-info">Page 1</span>
+                                <button onclick="loadAccounting(accountingPage + 1)" id="acct-next-page">Next &#9654;</button>
+                            </div>
                         </div>
 
-                        <div class="pagination">
-                            <button onclick="loadAccounting(accountingPage - 1)" id="acct-prev-page">&#9664; Prev</button>
-                            <span id="acct-page-info">Page 1</span>
-                            <button onclick="loadAccounting(accountingPage + 1)" id="acct-next-page">Next &#9654;</button>
+                        <!-- User Accounting Sub-tab -->
+                        <div id="acct-sub-users" class="hidden">
+                            <div class="search-bar-row">
+                                <input type="text" id="acct-user-search" placeholder="&#128269; Search by User ID or username..." oninput="searchUserAccounting()">
+                                <button class="export-csv-btn" onclick="exportUserAccountingCSV()">&#128229; Export CSV</button>
+                            </div>
+
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>User</th>
+                                            <th>Total Earned</th>
+                                            <th>Total Withdrawn</th>
+                                            <th>Pending Payouts</th>
+                                            <th>Current Balance</th>
+                                            <th>Last Payout</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="acct-users-table"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="pagination">
+                                <button onclick="loadUserAccounting(userAcctPage - 1)" id="ua-prev-page">&#9664; Prev</button>
+                                <span id="ua-page-info">Page 1</span>
+                                <button onclick="loadUserAccounting(userAcctPage + 1)" id="ua-next-page">Next &#9654;</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -900,6 +940,36 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=14"></script>
+    <!-- User Transaction History Modal -->
+    <div id="user-history-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:680px;">
+            <div class="modal-header" style="background:rgba(59,130,246,0.08);">
+                <h3>&#128196; Transaction History</h3>
+                <button class="modal-close" onclick="closeModal('user-history-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height:420px;overflow-y:auto;">
+                <p id="user-history-info" style="margin-bottom:12px;font-size:13px;color:var(--text2);"></p>
+                <div class="table-wrapper" style="margin:0;">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Source</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-history-table"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeModal('user-history-modal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/admin.js?v=15"></script>
 </body>
 </html>

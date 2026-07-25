@@ -1104,3 +1104,74 @@ async def get_transactions(page: int = 1, per_page: int = 50, date_filter: str =
             rows = [dict(r) for r in await cursor.fetchall()]
 
         return {"txns": rows, "total": total, "page": page, "per_page": per_page, "pages": max(1, -(-total // per_page))}
+
+
+async def get_user_accounting_list(search: str = "", page: int = 1, per_page: int = 30) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        query = """
+            SELECT
+                u.user_id,
+                u.username,
+                u.first_name,
+                u.balance as current_balance,
+                COALESCE(ta.total_earned, 0) as total_earned,
+                COALESCE(wd.total_withdrawn, 0) as total_withdrawn,
+                COALESCE(wp.pending_withdrawal, 0) as pending_withdrawal,
+                wd.last_payout_date
+            FROM users u
+            LEFT JOIN (
+                SELECT user_id, SUM(reward_amount) as total_earned
+                FROM task_activities WHERE status='COMPLETED'
+                GROUP BY user_id
+            ) ta ON u.user_id = ta.user_id
+            LEFT JOIN (
+                SELECT user_id, SUM(amount) as total_withdrawn, MAX(processed_at) as last_payout_date
+                FROM withdrawals WHERE status='approved'
+                GROUP BY user_id
+            ) wd ON u.user_id = wd.user_id
+            LEFT JOIN (
+                SELECT user_id, SUM(amount) as pending_withdrawal
+                FROM withdrawals WHERE status='pending'
+                GROUP BY user_id
+            ) wp ON u.user_id = wp.user_id
+        """
+        params = []
+        if search:
+            query += " WHERE u.user_id = ? OR u.username LIKE ? OR u.first_name LIKE ?"
+            params += [search, f"%{search}%", f"%{search}%"]
+
+        count_query = f"SELECT COUNT(*) FROM ({query})"
+        async with db.execute(count_query, params) as cursor:
+            total = (await cursor.fetchone())[0]
+
+        query += " ORDER BY ta.total_earned DESC NULLS LAST"
+        offset = (page - 1) * per_page
+        query += " LIMIT ? OFFSET ?"
+        async with db.execute(query, params + [per_page, offset]) as cursor:
+            rows = [dict(r) for r in await cursor.fetchall()]
+
+        return {"users": rows, "total": total, "page": page, "per_page": per_page, "pages": max(1, -(-total // per_page))}
+
+
+async def get_user_transaction_history(user_id: int) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+
+        async with db.execute(
+            "SELECT reward_amount as amount, platform_name as source, 'EARNED' as type, timestamp, status FROM task_activities WHERE user_id=? ORDER BY timestamp DESC LIMIT 100",
+            (user_id,)
+        ) as c:
+            earned = [dict(r) for r in await c.fetchall()]
+
+        async with db.execute(
+            "SELECT amount, wallet_address as source, 'WITHDRAWAL' as type, COALESCE(processed_at, created_at) as timestamp, status FROM withdrawals WHERE user_id=? ORDER BY created_at DESC LIMIT 100",
+            (user_id,)
+        ) as c:
+            withdrawals = [dict(r) for r in await c.fetchall()]
+
+        all_txns = earned + withdrawals
+        all_txns.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+
+        return {"history": all_txns[:100]}

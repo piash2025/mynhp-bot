@@ -72,6 +72,8 @@ from database import (
     create_transaction,
     get_accounting_summary,
     get_transactions,
+    get_user_accounting_list,
+    get_user_transaction_history,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -984,6 +986,29 @@ async def admin_accounting(request: Request):
     txns = await get_transactions(page=page, date_filter=date_filter)
 
     return {**summary, **txns}
+
+
+@app.get("/api/admin/accounting/users")
+async def admin_accounting_users(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    search = request.query_params.get("search", "")
+    page = int(request.query_params.get("page", 1))
+
+    return await get_user_accounting_list(search=search, page=page)
+
+
+@app.get("/api/admin/accounting/users/{user_id}/history")
+async def admin_accounting_user_history(user_id: int, request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    return await get_user_transaction_history(user_id)
 
 
 if __name__ == "__main__":
