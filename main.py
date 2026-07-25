@@ -316,7 +316,7 @@ async def admin_update_settings(request: Request):
     if not stored or stored != password:
         return {"error": "Unauthorized"}
 
-    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals"]:
+    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral"]:
         if key in data and data[key]:
             await set_admin_setting(key, str(data[key]))
     return {"status": "ok"}

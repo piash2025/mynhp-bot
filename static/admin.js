@@ -171,6 +171,8 @@ async function loadSettings() {
         var resp = await fetch('/api/admin/settings?password=' + adminToken);
         var settings = await resp.json();
         document.getElementById('set-referral-reward').value = settings.referral_reward || 0.001;
+        document.getElementById('set-min-ads-referral').value = settings.min_ads_for_referral || 5;
+        window._minAdsForReferral = parseInt(settings.min_ads_for_referral) || 5;
         document.getElementById('set-min-withdraw').value = settings.min_withdraw || 0.01;
         document.getElementById('set-farm-rate').value = settings.farm_rate || 0.001;
         document.getElementById('set-farm-duration').value = settings.farm_duration_hours || 4;
@@ -182,6 +184,7 @@ async function saveSettings() {
     var data = {
         password: adminToken,
         referral_reward: document.getElementById('set-referral-reward').value,
+        min_ads_for_referral: document.getElementById('set-min-ads-referral').value,
         min_withdraw: document.getElementById('set-min-withdraw').value,
         farm_rate: document.getElementById('set-farm-rate').value,
         farm_duration_hours: document.getElementById('set-farm-duration').value,
@@ -542,7 +545,7 @@ function renderReferrals(referrals) {
         var referredLabel = r.referred_username ? '@' + r.referred_username : '#' + r.referred_id;
         var statusClass = 'badge-' + r.status;
         var statusBadge = '<span class="badge ' + statusClass + '">' + r.status + '</span>';
-        var adsProgress = (r.ads_viewed || 0) + '/5';
+        var adsProgress = (r.ads_viewed || 0) + '/' + (window._minAdsForReferral || 5);
         var actions = '';
         if (r.status === 'pending') {
             actions = '<button class="btn-flag" onclick="flagReferral(' + r.id + ', \'flagged\')">&#128683; Flag</button>' +

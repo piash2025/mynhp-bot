@@ -153,6 +153,7 @@ async def init_db():
         defaults = {
             "referral_reward": "0.001",
             "min_withdraw": "0.01",
+            "min_ads_for_referral": "5",
             "farm_rate": "0.001",
             "farm_duration_hours": "4",
             "admin_password": "admin123",
@@ -286,7 +287,7 @@ async def check_referral_release(user_id: int):
                 "UPDATE referrals SET ads_viewed = ? WHERE id = ?", (new_count, ref["id"])
             )
 
-            min_ads = 5
+            min_ads = int(dict(await db.execute("SELECT value FROM admin_settings WHERE key='min_ads_for_referral'").fetchone() or {}).get("value", "5") or "5")
             if new_count >= min_ads:
                 await db.execute(
                     "UPDATE referrals SET status = 'valid' WHERE id = ?", (ref["id"],)

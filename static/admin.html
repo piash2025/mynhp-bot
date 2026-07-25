@@ -321,6 +321,11 @@
                         <input type="number" step="0.0001" id="set-referral-reward" value="0.001">
                     </div>
                     <div class="setting-item">
+                        <label>Min Ads for Referral Reward</label>
+                        <input type="number" id="set-min-ads-referral" value="5">
+                        <small style="color:var(--text2);font-size:11px;">Referred user must view this many ads before referrer gets paid</small>
+                    </div>
+                    <div class="setting-item">
                         <label>Min Withdraw (USDT)</label>
                         <input type="number" step="0.01" id="set-min-withdraw" value="0.01">
                     </div>
@@ -415,7 +420,7 @@
                     <div class="ref-rule-card">
                         <h3>&#128279; Referral Link Format</h3>
                         <code>https://t.me/mynhp_bot?start=ref_USERID</code>
-                        <p style="margin-top:8px;font-size:12px;color:var(--text2);">5 ad views minimum to unlock referral bonus</p>
+                        <p style="margin-top:8px;font-size:12px;color:var(--text2);">Minimum ad views to unlock referral bonus (configurable in Settings)</p>
                     </div>
                 </div>
 

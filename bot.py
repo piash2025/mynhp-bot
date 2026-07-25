@@ -25,6 +25,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     args = context.args
 
     referral_reward = float(await get_admin_setting("referral_reward") or "0.001")
+    min_ads = int(await get_admin_setting("min_ads_for_referral") or "5")
 
     if args and args[0].startswith("ref_"):
         try:
@@ -40,7 +41,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                     ref_name = referrer.get("first_name", "Someone") if referrer else "Someone"
                     await update.message.reply_text(
                         f"You were referred by {ref_name}!\n"
-                        f"Complete {5} ad views to unlock your {referral_reward} USDT bonus!"
+                        f"Complete {min_ads} ad views to unlock your {referral_reward} USDT bonus!"
                     )
                 else:
                     await add_or_update_user(user.id, user.username, user.first_name)
