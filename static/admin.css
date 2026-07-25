@@ -48,6 +48,34 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; transform: translateX(40px); } }
 
+/* Auth Loading Overlay */
+.auth-loader {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+}
+.auth-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--bg3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+.auth-loader-text {
+    margin-top: 16px;
+    color: var(--text2);
+    font-size: 14px;
+}
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
 /* Login */
 .login-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
 .login-card { background: var(--bg2); border-radius: 16px; padding: 40px; width: 100%; max-width: 380px; text-align: center; border: 1px solid var(--border); }

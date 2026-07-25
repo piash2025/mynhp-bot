@@ -1,4 +1,5 @@
 let adminToken = sessionStorage.getItem('adminToken') || null;
+let authChecking = true;
 let currentPage = 0;
 let allUsers = [];
 let currentWithdrawalFilter = '';
@@ -630,22 +631,40 @@ async function confirmDeletePlatform() {
     deletingPlatformId = null;
 }
 
-// ===== AUTO-LOGIN ON RELOAD =====
-if (adminToken) {
+// ===== AUTH CHECK ON LOAD =====
+(function checkAuth() {
+    var loader = document.getElementById('auth-loader');
+    var loginScreen = document.getElementById('login-screen');
+    var dashboard = document.getElementById('admin-dashboard');
+
+    if (!adminToken) {
+        authChecking = false;
+        loader.classList.add('hidden');
+        loginScreen.classList.remove('hidden');
+        return;
+    }
+
     fetch('/api/admin/stats?password=' + adminToken)
         .then(function(resp) { return resp.json(); })
         .then(function(data) {
             if (!data.error) {
-                document.getElementById('login-screen').classList.add('hidden');
-                document.getElementById('admin-dashboard').classList.remove('hidden');
+                authChecking = false;
+                loader.classList.add('hidden');
+                dashboard.classList.remove('hidden');
                 loadDashboard();
             } else {
+                authChecking = false;
                 sessionStorage.removeItem('adminToken');
                 adminToken = null;
+                loader.classList.add('hidden');
+                loginScreen.classList.remove('hidden');
             }
         })
         .catch(function() {
+            authChecking = false;
             sessionStorage.removeItem('adminToken');
             adminToken = null;
+            loader.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
         });
-}
+})();
