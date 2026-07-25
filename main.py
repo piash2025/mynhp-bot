@@ -66,6 +66,9 @@ from database import (
     update_last_active,
     update_last_seen,
     get_live_users_count,
+    create_task_activity,
+    get_task_activities,
+    get_task_activity_stats,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -350,6 +353,19 @@ async def update_user_balance(request: Request):
         await update_balance(user_id, reward)
         await update_last_active(user_id)
         await check_referral_release(user_id)
+
+        platform_name = data.get("platform_name", "")
+        await create_task_activity(
+            user_id=user_id,
+            username=user.get("username", "") if user else "",
+            first_name=user.get("first_name", "") if user else "",
+            platform_name=platform_name,
+            ad_type="Rewarded",
+            reward_amount=reward,
+            status="COMPLETED",
+            ip_address=ip or "",
+        )
+
         user = await get_user(user_id)
         if user:
             return {
@@ -910,6 +926,26 @@ async def admin_login_logs_cleanup(request: Request):
 
     deleted = await cleanup_old_login_logs(30)
     return {"status": "ok", "deleted": deleted}
+
+
+# ===== TASK ACTIVITIES =====
+
+@app.get("/api/admin/task-activities")
+async def admin_task_activities(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    page = int(request.query_params.get("page", 1))
+    per_page = int(request.query_params.get("per_page", 50))
+    search = request.query_params.get("search", "")
+    platform_filter = request.query_params.get("platform", "")
+
+    result = await get_task_activities(page, per_page, search, platform_filter)
+    stats = await get_task_activity_stats()
+    result["stats"] = stats
+    return result
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=12">
+    <link rel="stylesheet" href="/static/admin.css?v=13">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -83,6 +83,10 @@
                     <a class="sidebar-item" data-tab="loginlogs" onclick="switchAdminTab('loginlogs')">
                         <span class="sidebar-icon">&#128214;</span>
                         <span class="sidebar-label">Login Logs</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="tasks" onclick="switchAdminTab('tasks')">
+                        <span class="sidebar-icon">&#9989;</span>
+                        <span class="sidebar-label">Task Activities</span>
                     </a>
                 </nav>
 
@@ -645,6 +649,60 @@
                             <button onclick="loadLoginLogs(loginLogsPage + 1)" id="ll-next-page">Next &#9654;</button>
                         </div>
                     </div>
+
+                    <!-- Task Activities Tab -->
+                    <div class="admin-panel" id="panel-tasks">
+                        <h2>&#9989; Task Activity Log</h2>
+                        <p class="panel-desc">Track ad completions, rewards, and platform performance</p>
+
+                        <div class="task-stats">
+                            <div class="ts-stat">
+                                <span class="ts-stat-num" id="ts-total">0</span>
+                                <span class="ts-stat-label">Total Tasks</span>
+                            </div>
+                            <div class="ts-stat completed">
+                                <span class="ts-stat-num" id="ts-completed">0</span>
+                                <span class="ts-stat-label">Completed</span>
+                            </div>
+                            <div class="ts-stat reward">
+                                <span class="ts-stat-num" id="ts-reward">0.0000</span>
+                                <span class="ts-stat-label">Total Rewards (USDT)</span>
+                            </div>
+                        </div>
+
+                        <div class="platform-breakdown" id="ts-platforms"></div>
+
+                        <div class="search-bar-row">
+                            <input type="text" id="task-search" placeholder="&#128269; Search by User ID or username..." oninput="searchTaskActivities()">
+                            <select id="task-platform-filter" onchange="loadTaskActivities(1)" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg2);color:var(--text);font-size:13px;">
+                                <option value="">All Platforms</option>
+                            </select>
+                            <button class="export-csv-btn" onclick="exportTaskActivitiesCSV()">&#128229; Export CSV</button>
+                        </div>
+
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User</th>
+                                        <th>Platform</th>
+                                        <th>Ad Type</th>
+                                        <th>Reward</th>
+                                        <th>IP Address</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tasks-table"></tbody>
+                            </table>
+                        </div>
+
+                        <div class="pagination">
+                            <button onclick="loadTaskActivities(taskActivitiesPage - 1)" id="ts-prev-page">&#9664; Prev</button>
+                            <span id="ts-page-info">Page 1</span>
+                            <button onclick="loadTaskActivities(taskActivitiesPage + 1)" id="ts-next-page">Next &#9654;</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -782,6 +840,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=12"></script>
+    <script src="/static/admin.js?v=13"></script>
 </body>
 </html>

@@ -382,6 +382,7 @@ function claimReward() {
         body: JSON.stringify({
             user_id: currentUser?.id,
             reward: reward,
+            platform_name: currentAdNetwork || 'unknown',
         }),
     }).then(function(resp) {
         return resp.json();

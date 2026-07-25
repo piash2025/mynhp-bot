@@ -77,6 +77,7 @@ async function loadDashboard() {
     loadReferrals();
     loadLoginLogs(1);
     loadLiveCount();
+    loadTaskActivities(1);
     setInterval(loadLiveCount, 15000);
 }
 
@@ -152,7 +153,8 @@ var tabTitles = {
     settings: 'Bot Settings',
     users: 'User Management',
     referrals: 'Referral System',
-    loginlogs: 'Login Logs & Session Audit'
+    loginlogs: 'Login Logs & Session Audit',
+    tasks: 'Task Activity Log'
 };
 
 function switchAdminTab(tab) {
@@ -169,6 +171,7 @@ function switchAdminTab(tab) {
         ov.classList.remove('active');
     }
     if (tab === 'loginlogs') loadLoginLogs(loginLogsPage);
+    if (tab === 'tasks') loadTaskActivities(taskActivitiesPage);
 }
 
 // ===== AD RATES =====
@@ -1140,6 +1143,94 @@ function exportLoginLogsCSV() {
             var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
             downloadCSV('login_logs_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
             showToast('Login logs exported!', 'success');
+        });
+    } catch (e) { showToast('Export failed', 'error'); }
+}
+
+// ===== TASK ACTIVITIES =====
+var taskActivitiesPage = 1;
+var taskSearchDebounce = null;
+
+function loadTaskActivities(page) {
+    page = page || 1;
+    if (page < 1) return;
+    taskActivitiesPage = page;
+    var search = document.getElementById('task-search') ? document.getElementById('task-search').value : '';
+    var platformFilter = document.getElementById('task-platform-filter') ? document.getElementById('task-platform-filter').value : '';
+
+    fetch('/api/admin/task-activities?password=' + adminToken + '&page=' + page + '&per_page=50&search=' + encodeURIComponent(search) + '&platform=' + encodeURIComponent(platformFilter))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.error) { showToast(data.error, 'error'); return; }
+
+            var stats = data.stats || {};
+            document.getElementById('ts-total').textContent = stats.total || 0;
+            document.getElementById('ts-completed').textContent = stats.completed || 0;
+            document.getElementById('ts-reward').textContent = (stats.total_reward || 0).toFixed(4);
+
+            var platformsDiv = document.getElementById('ts-platforms');
+            platformsDiv.innerHTML = '';
+            var platforms = stats.platforms || [];
+            if (platforms.length > 0) {
+                platformsDiv.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">' +
+                    platforms.map(function(p) {
+                        return '<span style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:12px;color:var(--text2);"><strong style="color:var(--text);">' + (p.name || 'Unknown') + '</strong> &mdash; ' + p.count + ' tasks</span>';
+                    }).join('') + '</div>';
+            }
+
+            var select = document.getElementById('task-platform-filter');
+            var currentVal = select.value;
+            var knownPlatforms = {};
+            platforms.forEach(function(p) { knownPlatforms[p.name] = true; });
+            var optionsHtml = '<option value="">All Platforms</option>';
+            Object.keys(knownPlatforms).sort().forEach(function(name) {
+                optionsHtml += '<option value="' + name + '"' + (name === currentVal ? ' selected' : '') + '>' + name + '</option>';
+            });
+            select.innerHTML = optionsHtml;
+
+            var tbody = document.getElementById('tasks-table');
+            tbody.innerHTML = '';
+            var logs = data.logs || [];
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text2);">No task activities found</td></tr>';
+            } else {
+                logs.forEach(function(log) {
+                    var statusClass = log.status === 'COMPLETED' ? 'badge-approved' : (log.status === 'FAILED' ? 'badge-rejected' : 'badge-pending');
+                    tbody.innerHTML += '<tr>' +
+                        '<td style="white-space:nowrap;font-size:12px;">' + (log.timestamp || '') + '</td>' +
+                        '<td><strong>' + (log.user_id || '') + '</strong><br><span style="color:var(--text2);font-size:11px;">' + (log.username || log.first_name || '') + '</span></td>' +
+                        '<td><span style="font-size:12px;font-weight:600;">' + (log.platform_name || '-') + '</span></td>' +
+                        '<td><span style="font-size:11px;color:var(--text2);">' + (log.ad_type || '-') + '</span></td>' +
+                        '<td><span style="color:var(--accent);font-weight:600;font-size:13px;">' + (log.reward_amount || 0).toFixed(4) + '</span></td>' +
+                        '<td><code style="font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;">' + (log.ip_address || '-') + '</code></td>' +
+                        '<td><span class="badge ' + statusClass + '">' + (log.status || '') + '</span></td>' +
+                        '</tr>';
+                });
+            }
+
+            document.getElementById('ts-page-info').textContent = 'Page ' + data.page + ' of ' + data.pages;
+            document.getElementById('ts-prev-page').disabled = data.page <= 1;
+            document.getElementById('ts-next-page').disabled = data.page >= data.pages;
+        });
+}
+
+function searchTaskActivities() {
+    clearTimeout(taskSearchDebounce);
+    taskSearchDebounce = setTimeout(function() { loadTaskActivities(1); }, 300);
+}
+
+function exportTaskActivitiesCSV() {
+    try {
+        fetch('/api/admin/task-activities?password=' + adminToken + '&page=1&per_page=10000')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var rows = [['Timestamp', 'User ID', 'Username', 'First Name', 'Platform', 'Ad Type', 'Reward (USDT)', 'Status', 'IP Address']];
+            (data.logs || []).forEach(function(l) {
+                rows.push([l.timestamp||'', l.user_id||'', l.username||'', l.first_name||'', l.platform_name||'', l.ad_type||'', l.reward_amount||0, l.status||'', l.ip_address||'']);
+            });
+            var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
+            downloadCSV('task_activities_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
+            showToast('Task activities exported!', 'success');
         });
     } catch (e) { showToast('Export failed', 'error'); }
 }

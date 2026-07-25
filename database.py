@@ -174,6 +174,24 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_login_logs_timestamp ON login_logs(timestamp)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_login_logs_status ON login_logs(status)")
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS task_activities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                username TEXT DEFAULT '',
+                first_name TEXT DEFAULT '',
+                platform_name TEXT DEFAULT '',
+                ad_type TEXT DEFAULT 'Rewarded',
+                reward_amount REAL DEFAULT 0.0,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'COMPLETED',
+                ip_address TEXT DEFAULT ''
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_task_activities_user_id ON task_activities(user_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_task_activities_timestamp ON task_activities(timestamp)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_task_activities_platform ON task_activities(platform_name)")
+
         default_rates = [
             ("adsgream", 0.0005, 50, 1),
             ("monetag", 0.0005, 30, 1),
@@ -961,3 +979,59 @@ async def cleanup_old_login_logs(days: int = 30) -> int:
         )
         await db.commit()
         return cursor.rowcount
+
+
+# ===== TASK ACTIVITIES =====
+
+async def create_task_activity(user_id: int, username: str = "", first_name: str = "",
+                               platform_name: str = "", ad_type: str = "Rewarded",
+                               reward_amount: float = 0.0, status: str = "COMPLETED",
+                               ip_address: str = ""):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO task_activities (user_id, username, first_name, platform_name, ad_type,
+                                         reward_amount, status, ip_address)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (user_id, username, first_name, platform_name, ad_type, reward_amount, status, ip_address))
+        await db.commit()
+
+
+async def get_task_activities(page: int = 1, per_page: int = 50, search: str = "",
+                              platform_filter: str = "") -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        where_clauses = []
+        params = []
+
+        if search:
+            where_clauses.append("(user_id = ? OR username LIKE ? OR first_name LIKE ?)")
+            params.extend([search, f"%{search}%", f"%{search}%"])
+        if platform_filter:
+            where_clauses.append("platform_name = ?")
+            params.append(platform_filter)
+
+        where_sql = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        count_query = f"SELECT COUNT(*) FROM task_activities{where_sql}"
+        async with db.execute(count_query, params) as cursor:
+            total = (await cursor.fetchone())[0]
+
+        offset = (page - 1) * per_page
+        query = f"SELECT * FROM task_activities{where_sql} ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+        async with db.execute(query, params + [per_page, offset]) as cursor:
+            rows = [dict(r) for r in await cursor.fetchall()]
+
+        return {"logs": rows, "total": total, "page": page, "per_page": per_page, "pages": max(1, -(-total // per_page))}
+
+
+async def get_task_activity_stats() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COUNT(*) FROM task_activities") as c:
+            total = (await c.fetchone())[0]
+        async with db.execute("SELECT COUNT(*) FROM task_activities WHERE status='COMPLETED'") as c:
+            completed = (await c.fetchone())[0]
+        async with db.execute("SELECT COALESCE(SUM(reward_amount), 0) FROM task_activities WHERE status='COMPLETED'") as c:
+            total_reward = (await c.fetchone())[0]
+        async with db.execute("SELECT platform_name, COUNT(*) as cnt FROM task_activities WHERE status='COMPLETED' GROUP BY platform_name ORDER BY cnt DESC") as c:
+            platforms = [{"name": r[0], "count": r[1]} for r in await c.fetchall()]
+        return {"total": total, "completed": completed, "total_reward": total_reward, "platforms": platforms}

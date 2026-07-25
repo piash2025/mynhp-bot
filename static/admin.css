@@ -617,6 +617,16 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     vertical-align: middle;
 }
 
+/* ===== TASK ACTIVITY STATS ===== */
+.task-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.ts-stat { background: var(--bg2); border-radius: 10px; padding: 14px; text-align: center; border: 1px solid var(--border); }
+.ts-stat.completed { border-color: rgba(16,185,129,0.3); }
+.ts-stat.reward { border-color: rgba(59,130,246,0.3); }
+.ts-stat-num { display: block; font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.ts-stat.completed .ts-stat-num { color: var(--accent); }
+.ts-stat.reward .ts-stat-num { color: var(--blue); }
+.ts-stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; }
+
 /* ===== LOGIN LOG STATS ===== */
 .login-log-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
 .ll-stat { background: var(--bg2); border-radius: 10px; padding: 14px; text-align: center; border: 1px solid var(--border); }
