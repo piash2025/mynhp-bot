@@ -21,6 +21,14 @@ from database import (
     get_admin_setting,
     get_total_earnings,
     get_referral_count,
+    create_withdrawal,
+    get_all_withdrawals,
+    get_withdrawal,
+    update_withdrawal_status,
+    get_withdrawal_stats,
+    log_fraud,
+    get_fraud_logs,
+    get_fraud_stats,
 )
 from ads_integration import get_ad
 
@@ -169,10 +177,16 @@ async def admin_stats(request: Request):
     conn.close()
     total_referrals = row[0] if row else 0
 
+    withdrawal_stats = await get_withdrawal_stats()
+    fraud_stats = await get_fraud_stats()
+
     return {
         "total_users": total_users,
         "total_earnings": total_earnings,
         "total_referrals": total_referrals,
+        "pending_withdrawals": withdrawal_stats["pending"]["count"],
+        "pending_payout_amount": withdrawal_stats["pending"]["amount"],
+        "fraud_alerts": fraud_stats["high"],
     }
 
 
@@ -219,7 +233,7 @@ async def admin_update_settings(request: Request):
     if not stored or stored != password:
         return {"error": "Unauthorized"}
 
-    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password"]:
+    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals"]:
         if key in data and data[key]:
             await set_admin_setting(key, str(data[key]))
     return {"status": "ok"}
@@ -235,6 +249,119 @@ async def admin_users(request: Request):
     page = int(request.query_params.get("page", 0))
     users = await get_all_users(page=page, limit=50)
     return {"users": users}
+
+
+# ===== WITHDRAWAL API =====
+
+@app.post("/api/withdraw")
+async def request_withdrawal(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    amount = data.get("amount", 0)
+    payment_method = data.get("payment_method", "USDT")
+    wallet_address = data.get("wallet_address", "")
+
+    if not user_id or not amount or not wallet_address:
+        return {"error": "user_id, amount, wallet_address required"}
+
+    user = await get_user(user_id)
+    if not user:
+        return {"error": "User not found"}
+
+    min_withdraw = float(await get_admin_setting("min_withdraw") or "0.01")
+    if amount < min_withdraw:
+        return {"error": f"Minimum withdrawal is {min_withdraw} USDT"}
+
+    if user.get("balance", 0) < amount:
+        return {"error": "Insufficient balance"}
+
+    max_daily = int(await get_admin_setting("max_daily_withdrawals") or "3")
+    from database import get_user_withdrawal_count_today
+    daily_count = await get_user_withdrawal_count_today(user_id)
+    if daily_count >= max_daily:
+        return {"error": f"Daily withdrawal limit reached ({max_daily})"}
+
+    await create_withdrawal(user_id, user.get("username", ""), amount, payment_method, wallet_address)
+    return {"status": "ok", "message": "Withdrawal request submitted"}
+
+
+@app.get("/api/admin/withdrawals")
+async def admin_get_withdrawals(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    status = request.query_params.get("status", None)
+    page = int(request.query_params.get("page", 0))
+    withdrawals = await get_all_withdrawals(status=status, page=page)
+    stats = await get_withdrawal_stats()
+    return {"withdrawals": withdrawals, "stats": stats}
+
+
+@app.post("/api/admin/withdrawals/{withdrawal_id}/approve")
+async def admin_approve_withdrawal(withdrawal_id: int, request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    note = data.get("note", "Approved by admin")
+    await update_withdrawal_status(withdrawal_id, "approved", note)
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/withdrawals/{withdrawal_id}/reject")
+async def admin_reject_withdrawal(withdrawal_id: int, request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    note = data.get("note", "Rejected by admin")
+    await update_withdrawal_status(withdrawal_id, "rejected", note)
+    return {"status": "ok"}
+
+
+# ===== FRAUD DETECTION API =====
+
+@app.post("/api/fraud/log")
+async def fraud_log_endpoint(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    activity_type = data.get("activity_type")
+    description = data.get("description", "")
+    ip_address = data.get("ip_address", "")
+    severity = data.get("severity", "low")
+
+    user = await get_user(user_id) if user_id else None
+    username = user.get("username", "") if user else ""
+    await log_fraud(user_id or 0, username, activity_type, description, ip_address, severity)
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/fraud-logs")
+async def admin_get_fraud_logs(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    page = int(request.query_params.get("page", 0))
+    logs = await get_fraud_logs(page=page)
+    stats = await get_fraud_stats()
+    return {"logs": logs, "stats": stats}
+
+
+@app.get("/api/admin/fraud-stats")
+async def admin_fraud_stats(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    return await get_fraud_stats()
 
 
 if __name__ == "__main__":
