@@ -80,7 +80,7 @@
                     </div>
 
                     <!-- Task Card: AdsGram -->
-                    <div class="task-card">
+                    <div class="task-card" id="task-adsgream">
                         <div class="task-header">
                             <div class="task-network">
                                 <div class="network-icon adsgream-icon">AG</div>
@@ -89,17 +89,17 @@
                                     <span class="task-type">Rewarded Ad</span>
                                 </div>
                             </div>
-                            <div class="task-reward">+0.0005 USDT</div>
+                            <div class="task-reward" id="reward-adsgream">+0.0005 USDT</div>
                         </div>
                         <p class="task-desc">Watch a short video ad and earn instant USDT reward. Fast &amp; easy!</p>
                         <div class="task-footer">
-                            <span class="task-limit">Daily limit: 50/50</span>
+                            <span class="task-limit" id="limit-adsgream">Daily limit: 50/50</span>
                             <button class="watch-btn" onclick="watchAd('adsgream')">WATCH</button>
                         </div>
                     </div>
 
                     <!-- Task Card: Monetag -->
-                    <div class="task-card">
+                    <div class="task-card" id="task-monetag">
                         <div class="task-header">
                             <div class="task-network">
                                 <div class="network-icon monetag-icon">MT</div>
@@ -108,17 +108,17 @@
                                     <span class="task-type">Interstitial Ad</span>
                                 </div>
                             </div>
-                            <div class="task-reward">+0.0005 USDT</div>
+                            <div class="task-reward" id="reward-monetag">+0.0005 USDT</div>
                         </div>
                         <p class="task-desc">View a full-screen interstitial ad. Higher engagement = bonus reward!</p>
                         <div class="task-footer">
-                            <span class="task-limit">Daily limit: 30/30</span>
+                            <span class="task-limit" id="limit-monetag">Daily limit: 30/30</span>
                             <button class="watch-btn" onclick="watchAd('monetag')">WATCH</button>
                         </div>
                     </div>
 
                     <!-- Task Card: Adexium -->
-                    <div class="task-card">
+                    <div class="task-card" id="task-adexium">
                         <div class="task-header">
                             <div class="task-network">
                                 <div class="network-icon adexium-icon">AX</div>
@@ -127,17 +127,17 @@
                                     <span class="task-type">Banner Ad</span>
                                 </div>
                             </div>
-                            <div class="task-reward">+0.0005 USDT</div>
+                            <div class="task-reward" id="reward-adexium">+0.0005 USDT</div>
                         </div>
                         <p class="task-desc">Click and view banner advertisement. Simple &amp; quick earnings!</p>
                         <div class="task-footer">
-                            <span class="task-limit">Daily limit: 40/40</span>
+                            <span class="task-limit" id="limit-adexium">Daily limit: 40/40</span>
                             <button class="watch-btn" onclick="watchAd('adexium')">WATCH</button>
                         </div>
                     </div>
 
                     <!-- Bonus Task -->
-                    <div class="task-card bonus-card">
+                    <div class="task-card bonus-card" id="task-bonus">
                         <div class="task-header">
                             <div class="task-network">
                                 <div class="network-icon bonus-icon">&#127873;</div>
@@ -146,11 +146,11 @@
                                     <span class="task-type">Special Offer</span>
                                 </div>
                             </div>
-                            <div class="task-reward">+0.0050 USDT</div>
+                            <div class="task-reward" id="reward-bonus">+0.0050 USDT</div>
                         </div>
                         <p class="task-desc">Complete a special sponsored offer. Higher reward for extra effort!</p>
                         <div class="task-footer">
-                            <span class="task-limit">Limited: 5 left</span>
+                            <span class="task-limit" id="limit-bonus">Limited: 5 left</span>
                             <button class="watch-btn bonus-btn" onclick="watchAd('bonus')">WATCH</button>
                         </div>
                     </div>
@@ -184,8 +184,8 @@
                         <h3>&#128161; How Farming Works</h3>
                         <ul>
                             <li>Start farming to earn passive USDT</li>
-                            <li>Each cycle lasts 4 hours</li>
-                            <li>Earn 0.001 USDT per cycle</li>
+                            <li>Each cycle lasts <span id="farm-duration-text">4</span> hours</li>
+                            <li>Earn <span id="farm-rate-text">0.001</span> USDT per cycle</li>
                             <li>Claim rewards before starting new cycle</li>
                         </ul>
                     </div>

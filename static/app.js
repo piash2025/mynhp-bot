@@ -17,6 +17,15 @@ let farmInterval = null;
 let farmStartTime = null;
 let farmBalance = 0;
 
+// ===== CONFIG (fetched from API) =====
+let appConfig = {
+    ad_rates: {},
+    farm_rate: 0.001,
+    farm_duration_hours: 4,
+    referral_reward: 0.001,
+    min_withdraw: 0.01,
+};
+
 // ===== INIT =====
 if (tg?.initDataUnsafe?.user) {
     currentUser = tg.initDataUnsafe.user;
@@ -33,8 +42,39 @@ if (tg?.initDataUnsafe?.user) {
         }),
     });
 
+    loadConfig();
     loadStats();
     loadUserData();
+}
+
+async function loadConfig() {
+    try {
+        const resp = await fetch('/api/config');
+        appConfig = await resp.json();
+        updateAdCardsUI();
+    } catch (e) { /* ignore */ }
+}
+
+function updateAdCardsUI() {
+    const networks = ['adsgream', 'monetag', 'adexium', 'bonus'];
+    networks.forEach(function(net) {
+        const rateData = appConfig.ad_rates[net];
+        if (!rateData) return;
+        const rewardEl = document.getElementById('reward-' + net);
+        const limitEl = document.getElementById('limit-' + net);
+        const cardEl = document.getElementById('task-' + net);
+        if (rewardEl) {
+            rewardEl.textContent = '+' + rateData.rate.toFixed(4) + ' USDT';
+        }
+        if (limitEl) {
+            limitEl.textContent = 'Daily limit: ' + rateData.daily_limit + '/' + rateData.daily_limit;
+        }
+        if (cardEl) {
+            cardEl.style.display = rateData.enabled ? '' : 'none';
+        }
+    });
+    document.getElementById('farm-rate-text').textContent = appConfig.farm_rate.toFixed(4);
+    document.getElementById('farm-duration-text').textContent = appConfig.farm_duration_hours;
 }
 
 async function loadStats() {
@@ -175,7 +215,8 @@ function watchAd(network) {
 }
 
 function claimReward() {
-    const reward = 0.0005;
+    const rateData = appConfig.ad_rates[currentAdNetwork];
+    const reward = rateData ? rateData.rate : 0.0005;
     balance += reward;
     totalEarned += reward;
     todayEarned += reward;
@@ -228,12 +269,14 @@ function startFarming() {
     btn.classList.add('farming');
     document.getElementById('farm-status').textContent = 'Farming in progress...';
 
+    const totalDuration = appConfig.farm_duration_hours * 60 * 60 * 1000;
+    const totalReward = appConfig.farm_rate;
+
     farmInterval = setInterval(() => {
         const elapsed = Date.now() - farmStartTime;
-        const totalDuration = 4 * 60 * 60 * 1000;
         const progress = Math.min((elapsed / totalDuration) * 100, 100);
 
-        farmBalance = (progress / 100) * 0.001;
+        farmBalance = (progress / 100) * totalReward;
         document.getElementById('farm-progress').style.width = progress + '%';
         document.getElementById('farm-amount').textContent = farmBalance.toFixed(4) + ' USDT';
 
@@ -283,8 +326,9 @@ function stopFarming() {
 
 // ===== WITHDRAW =====
 function withdraw() {
-    if (balance < 0.01) {
-        alert('Minimum withdrawal is 0.01 USDT. Current: ' + balance.toFixed(4));
+    const min = appConfig.min_withdraw || 0.01;
+    if (balance < min) {
+        alert('Minimum withdrawal is ' + min.toFixed(4) + ' USDT. Current: ' + balance.toFixed(4));
         return;
     }
     alert('Withdrawal request submitted! Processing within 24 hours.');

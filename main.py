@@ -128,6 +128,19 @@ async def get_network_rate(network: str):
     return {"error": "Network not found"}
 
 
+@app.get("/api/config")
+async def get_public_config():
+    rates = await get_all_ad_rates()
+    settings = await get_all_admin_settings()
+    return {
+        "ad_rates": {r["network"]: {"rate": r["rate"], "daily_limit": r["daily_limit"], "enabled": r["enabled"]} for r in rates},
+        "farm_rate": float(settings.get("farm_rate", "0.001")),
+        "farm_duration_hours": float(settings.get("farm_duration_hours", "4")),
+        "referral_reward": float(settings.get("referral_reward", "0.001")),
+        "min_withdraw": float(settings.get("min_withdraw", "0.01")),
+    }
+
+
 # ===== ADMIN API =====
 
 @app.post("/api/admin/login")
