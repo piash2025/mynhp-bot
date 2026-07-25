@@ -377,30 +377,65 @@
             <!-- Referrals Tab -->
             <div class="admin-panel" id="panel-referrals">
                 <h2>&#128640; Referral System</h2>
-                <div class="referral-info">
-                    <div class="ref-card">
-                        <h3>&#128161; How it works</h3>
-                        <ul>
-                            <li>Each user gets a unique referral link</li>
-                            <li>New users join via the link</li>
-                            <li>Both referrer and new user get bonus</li>
-                            <li>Rewards are set in Settings tab</li>
-                        </ul>
+
+                <div class="ref-summary-cards">
+                    <div class="ref-stat-card">
+                        <div class="ref-stat-icon">&#128101;</div>
+                        <div class="ref-stat-info">
+                            <div class="ref-stat-label">Total Referrals</div>
+                            <div class="ref-stat-value" id="ref-total">0</div>
+                        </div>
                     </div>
-                    <div class="ref-card">
-                        <h3>&#128279; Referral Link Format</h3>
-                        <code>https://t.me/mynhp_bot?start=ref_USERID</code>
-                        <p>Users share this link. New users who start with this link get tracked.</p>
+                    <div class="ref-stat-card">
+                        <div class="ref-stat-icon">&#128176;</div>
+                        <div class="ref-stat-info">
+                            <div class="ref-stat-label">Commission Paid ($)</div>
+                            <div class="ref-stat-value" id="ref-commission">0.0000</div>
+                        </div>
+                    </div>
+                    <div class="ref-stat-card">
+                        <div class="ref-stat-icon">&#127942;</div>
+                        <div class="ref-stat-info">
+                            <div class="ref-stat-label">Top Referrer</div>
+                            <div class="ref-stat-value" id="ref-top" style="font-size:13px;">-</div>
+                            <div class="ref-stat-sub" id="ref-top-count"></div>
+                        </div>
                     </div>
                 </div>
+
+                <div class="referral-rules">
+                    <div class="ref-rule-card">
+                        <h3>&#128161; How it works</h3>
+                        <ul>
+                            <li>Rewards are <strong>held pending</strong> until referred user views 5 ads</li>
+                            <li>Same-IP referrals are <strong>auto-flagged</strong></li>
+                            <li>Admin can manually flag/unflag referrals</li>
+                        </ul>
+                    </div>
+                    <div class="ref-rule-card">
+                        <h3>&#128279; Referral Link Format</h3>
+                        <code>https://t.me/mynhp_bot?start=ref_USERID</code>
+                        <p style="margin-top:8px;font-size:12px;color:var(--text2);">5 ad views minimum to unlock referral bonus</p>
+                    </div>
+                </div>
+
+                <div class="search-bar-row">
+                    <input type="text" id="referral-search" placeholder="&#128269; Search by Referrer ID, Referred ID, or username..." oninput="searchReferrals()">
+                    <button class="export-csv-btn" onclick="exportReferralsCSV()">&#128229; Export CSV</button>
+                    <button class="btn-auto-flag" onclick="autoFlagIPReferrals()">&#128683; Auto-Flag Same IPs</button>
+                </div>
+
                 <div class="table-wrapper">
                     <table class="data-table">
                         <thead>
                             <tr>
                                 <th>Referrer</th>
                                 <th>Referred User</th>
-                                <th>Reward</th>
-                                <th>Date</th>
+                                <th>Joined</th>
+                                <th>Commission</th>
+                                <th>Ads Viewed</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="referrals-table"></tbody>
@@ -542,6 +577,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=5"></script>
+    <script src="/static/admin.js?v=6"></script>
 </body>
 </html>

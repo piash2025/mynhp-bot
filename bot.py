@@ -31,13 +31,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             referrer_id = int(args[0].replace("ref_", ""))
             if referrer_id != user.id:
                 await add_or_update_user(user.id, user.username, user.first_name)
-                success = await add_referral(referrer_id, user.id, referral_reward)
+                referrer = await get_user(referrer_id)
+                referrer_ip = referrer.get("ip_address", "") if referrer else ""
+                referred_user = await get_user(user.id)
+                referred_ip = referred_user.get("ip_address", "") if referred_user else ""
+                success = await add_referral(referrer_id, user.id, referral_reward, referrer_ip, referred_ip)
                 if success:
-                    referrer = await get_user(referrer_id)
                     ref_name = referrer.get("first_name", "Someone") if referrer else "Someone"
                     await update.message.reply_text(
                         f"You were referred by {ref_name}!\n"
-                        f"You both earned {referral_reward} USDT bonus!"
+                        f"Complete {5} ad views to unlock your {referral_reward} USDT bonus!"
                     )
                 else:
                     await add_or_update_user(user.id, user.username, user.first_name)

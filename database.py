@@ -56,11 +56,19 @@ async def init_db():
                 referrer_id INTEGER NOT NULL,
                 referred_id INTEGER NOT NULL,
                 reward REAL DEFAULT 0.001,
+                status TEXT DEFAULT 'pending',
+                ads_viewed INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (referrer_id) REFERENCES users(user_id),
                 FOREIGN KEY (referred_id) REFERENCES users(user_id)
             )
         """)
+
+        for col, default in [("status", "'pending'"), ("ads_viewed", "0")]:
+            try:
+                await db.execute(f"ALTER TABLE referrals ADD COLUMN {col} DEFAULT {default}")
+            except Exception:
+                pass
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS admin_settings (
@@ -237,7 +245,7 @@ async def update_ad_rate(network: str, rate: float = None, daily_limit: int = No
         await db.commit()
 
 
-async def add_referral(referrer_id: int, referred_id: int, reward: float):
+async def add_referral(referrer_id: int, referred_id: int, reward: float, referrer_ip: str = "", referred_ip: str = ""):
     async with aiosqlite.connect(DB_PATH) as db:
         exists = await db.execute(
             "SELECT id FROM referrals WHERE referred_id = ?", (referred_id,)
@@ -246,16 +254,153 @@ async def add_referral(referrer_id: int, referred_id: int, reward: float):
         if row:
             return False
 
+        status = "pending"
+        if referrer_ip and referred_ip and referrer_ip == referred_ip:
+            status = "flagged"
+
         await db.execute("""
-            INSERT INTO referrals (referrer_id, referred_id, reward)
-            VALUES (?, ?, ?)
-        """, (referrer_id, referred_id, reward))
+            INSERT INTO referrals (referrer_id, referred_id, reward, status)
+            VALUES (?, ?, ?, ?)
+        """, (referrer_id, referred_id, reward, status))
         await db.execute("""
-            UPDATE users SET balance = balance + ?, total_earned = total_earned + ?, total_referrals = total_referrals + 1
+            UPDATE users SET total_referrals = total_referrals + 1
             WHERE user_id = ?
-        """, (reward, reward, referrer_id))
+        """, (referrer_id,))
         await db.commit()
         return True
+
+
+async def check_referral_release(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM referrals WHERE referred_id = ? AND status = 'pending'", (user_id,)
+        ) as cursor:
+            ref = await cursor.fetchone()
+            if not ref:
+                return
+
+            ref = dict(ref)
+            new_count = ref["ads_viewed"] + 1
+            await db.execute(
+                "UPDATE referrals SET ads_viewed = ? WHERE id = ?", (new_count, ref["id"])
+            )
+
+            min_ads = 5
+            if new_count >= min_ads:
+                await db.execute(
+                    "UPDATE referrals SET status = 'valid' WHERE id = ?", (ref["id"],)
+                )
+                await db.execute("""
+                    UPDATE users SET balance = balance + ?, total_earned = total_earned + ?
+                    WHERE user_id = ?
+                """, (ref["reward"], ref["reward"], ref["referrer_id"]))
+
+            await db.commit()
+
+
+async def get_referral_by_referred(user_id: int) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM referrals WHERE referred_id = ?", (user_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def flag_referral(referral_id: int, status: str = "flagged"):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE referrals SET status = ? WHERE id = ?", (status, referral_id))
+        await db.commit()
+
+
+async def get_referral_summary() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COUNT(*) FROM referrals") as cursor:
+            row = await cursor.fetchone()
+            total = row[0]
+
+        async with db.execute("SELECT COALESCE(SUM(reward), 0) FROM referrals WHERE status = 'valid'") as cursor:
+            row = await cursor.fetchone()
+            commission_paid = row[0]
+
+        async with db.execute("""
+            SELECT referrer_id, COUNT(*) as cnt FROM referrals
+            WHERE status = 'valid' GROUP BY referrer_id ORDER BY cnt DESC LIMIT 1
+        """) as cursor:
+            row = await cursor.fetchone()
+            top_referrer_id = row[0] if row else None
+            top_referrer_count = row[1] if row else 0
+
+        top_referrer_name = ""
+        if top_referrer_id:
+            async with db.execute("SELECT username, first_name FROM users WHERE user_id = ?", (top_referrer_id,)) as cursor:
+                urow = await cursor.fetchone()
+                if urow:
+                    top_referrer_name = urow[0] or urow[1] or str(top_referrer_id)
+
+        return {
+            "total_referrals": total,
+            "commission_paid": commission_paid,
+            "top_referrer_id": top_referrer_id,
+            "top_referrer_name": top_referrer_name,
+            "top_referrer_count": top_referrer_count,
+        }
+
+
+async def get_all_referrals(page: int = 0, limit: int = 50, search: str = "") -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        offset = page * limit
+
+        if search:
+            search_pattern = f"%{search}%"
+            query = """
+                SELECT r.*, 
+                    ru.username as referrer_username, ru.first_name as referrer_name,
+                    rd.username as referred_username, rd.first_name as referred_name,
+                    rd.ip_address as referred_ip
+                FROM referrals r
+                LEFT JOIN users ru ON r.referrer_id = ru.user_id
+                LEFT JOIN users rd ON r.referred_id = rd.user_id
+                WHERE r.referrer_id LIKE ? OR r.referred_id LIKE ?
+                    OR ru.username LIKE ? OR rd.username LIKE ?
+                ORDER BY r.created_at DESC LIMIT ? OFFSET ?
+            """
+            async with db.execute(query, (search_pattern, search_pattern, search_pattern, search_pattern, limit, offset)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(r) for r in rows]
+        else:
+            query = """
+                SELECT r.*, 
+                    ru.username as referrer_username, ru.first_name as referrer_name,
+                    rd.username as referred_username, rd.first_name as referred_name,
+                    rd.ip_address as referred_ip
+                FROM referrals r
+                LEFT JOIN users ru ON r.referrer_id = ru.user_id
+                LEFT JOIN users rd ON r.referred_id = rd.user_id
+                ORDER BY r.created_at DESC LIMIT ? OFFSET ?
+            """
+            async with db.execute(query, (limit, offset)) as cursor:
+                rows = await cursor.fetchall()
+                return [dict(r) for r in rows]
+
+
+async def auto_flag_same_ip_referrals():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE referrals SET status = 'flagged'
+            WHERE id IN (
+                SELECT r.id FROM referrals r
+                JOIN users u_ref ON r.referrer_id = u_ref.user_id
+                JOIN users u_rd ON r.referred_id = u_rd.user_id
+                WHERE u_ref.ip_address = u_rd.ip_address
+                AND u_ref.ip_address != ''
+                AND r.status = 'pending'
+            )
+        """)
+        await db.commit()
 
 
 async def get_referral_count(user_id: int) -> int:

@@ -46,6 +46,11 @@ from database import (
     get_vpn_users,
     update_session_id,
     verify_session,
+    check_referral_release,
+    get_referral_summary,
+    get_all_referrals,
+    flag_referral,
+    auto_flag_same_ip_referrals,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -182,6 +187,7 @@ async def update_user_balance(request: Request):
             geo = await get_geo_info(ip)
             await update_user_ip(user_id, ip, geo["country"], geo["city"], geo["is_vpn"])
         await update_balance(user_id, reward)
+        await check_referral_release(user_id)
         user = await get_user(user_id)
         if user:
             return {
@@ -407,6 +413,55 @@ async def admin_reject_withdrawal(withdrawal_id: int, request: Request):
 
     note = data.get("note", "Rejected by admin")
     await update_withdrawal_status(withdrawal_id, "rejected", note)
+    return {"status": "ok"}
+
+
+# ===== REFERRAL MANAGEMENT API =====
+
+@app.get("/api/admin/referral-summary")
+async def admin_referral_summary(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    return await get_referral_summary()
+
+
+@app.get("/api/admin/referrals")
+async def admin_referrals(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    page = int(request.query_params.get("page", 0))
+    search = request.query_params.get("search", "")
+    referrals = await get_all_referrals(page=page, search=search)
+    return {"referrals": referrals}
+
+
+@app.post("/api/admin/referrals/{referral_id}/flag")
+async def admin_flag_referral(referral_id: int, request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    status = data.get("status", "flagged")
+    await flag_referral(referral_id, status)
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/referrals/auto-flag-ip")
+async def admin_auto_flag_ip(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    await auto_flag_same_ip_referrals()
     return {"status": "ok"}
 
 

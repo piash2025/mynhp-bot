@@ -72,6 +72,8 @@ async function loadDashboard() {
     loadFraudIPGroups();
     await loadPlatforms();
     await loadDashboardCharts();
+    loadReferralSummary();
+    loadReferrals();
 }
 
 async function loadStats() {
@@ -494,6 +496,112 @@ async function loadFraudIPGroups() {
             });
         }
     } catch (e) { /* ignore */ }
+}
+
+// ===== REFERRAL SYSTEM =====
+var allReferrals = [];
+
+async function loadReferralSummary() {
+    try {
+        var resp = await fetch('/api/admin/referral-summary?password=' + adminToken);
+        var data = await resp.json();
+        document.getElementById('ref-total').textContent = data.total_referrals || 0;
+        document.getElementById('ref-commission').textContent = (data.commission_paid || 0).toFixed(4);
+        if (data.top_referrer_name) {
+            document.getElementById('ref-top').textContent = '@' + data.top_referrer_name + ' (#' + data.top_referrer_id + ')';
+            document.getElementById('ref-top-count').textContent = data.top_referrer_count + ' referrals';
+        } else {
+            document.getElementById('ref-top').textContent = 'No referrals yet';
+            document.getElementById('ref-top-count').textContent = '';
+        }
+    } catch (e) { /* ignore */ }
+}
+
+async function loadReferrals() {
+    try {
+        var search = document.getElementById('referral-search') ? document.getElementById('referral-search').value : '';
+        var url = '/api/admin/referrals?password=' + adminToken;
+        if (search) url += '&search=' + encodeURIComponent(search);
+        var resp = await fetch(url);
+        var data = await resp.json();
+        allReferrals = data.referrals || [];
+        renderReferrals(allReferrals);
+    } catch (e) { /* ignore */ }
+}
+
+function renderReferrals(referrals) {
+    var tbody = document.getElementById('referrals-table');
+    tbody.innerHTML = '';
+    if (referrals.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:30px;">No referrals found</td></tr>';
+        return;
+    }
+    referrals.forEach(function(r) {
+        var date = r.created_at ? new Date(r.created_at).toLocaleDateString() + ' ' + new Date(r.created_at).toLocaleTimeString() : '-';
+        var referrerLabel = r.referrer_username ? '@' + r.referrer_username : '#' + r.referrer_id;
+        var referredLabel = r.referred_username ? '@' + r.referred_username : '#' + r.referred_id;
+        var statusClass = 'badge-' + r.status;
+        var statusBadge = '<span class="badge ' + statusClass + '">' + r.status + '</span>';
+        var adsProgress = (r.ads_viewed || 0) + '/5';
+        var actions = '';
+        if (r.status === 'pending') {
+            actions = '<button class="btn-flag" onclick="flagReferral(' + r.id + ', \'flagged\')">&#128683; Flag</button>' +
+                '<button class="btn-valid" onclick="flagReferral(' + r.id + ', \'valid\')">&#10004; Force Valid</button>';
+        } else if (r.status === 'flagged') {
+            actions = '<button class="btn-valid" onclick="flagReferral(' + r.id + ', \'valid\')">&#10004; Unflag</button>';
+        } else {
+            actions = '<span style="color:var(--text2);font-size:11px;">Completed</span>';
+        }
+        tbody.innerHTML += '<tr>' +
+            '<td>' + referrerLabel + '</td>' +
+            '<td>' + referredLabel + '</td>' +
+            '<td>' + date + '</td>' +
+            '<td><strong>' + (r.reward || 0).toFixed(4) + '</strong> USDT</td>' +
+            '<td>' + adsProgress + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td>' + actions + '</td></tr>';
+    });
+}
+
+function searchReferrals() {
+    loadReferrals();
+}
+
+async function flagReferral(id, status) {
+    try {
+        await fetch('/api/admin/referrals/' + id + '/flag', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: adminToken, status: status }),
+        });
+        showToast('Referral ' + status + '!', status === 'flagged' ? 'warning' : 'success');
+        loadReferrals();
+        loadReferralSummary();
+    } catch (e) { showToast('Failed to update referral', 'error'); }
+}
+
+async function autoFlagIPReferrals() {
+    try {
+        await fetch('/api/admin/referrals/auto-flag-ip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: adminToken }),
+        });
+        showToast('Same-IP referrals flagged!', 'warning');
+        loadReferrals();
+    } catch (e) { showToast('Failed to auto-flag', 'error'); }
+}
+
+function exportReferralsCSV() {
+    try {
+        var rows = [['Referrer ID', 'Referrer Username', 'Referred ID', 'Referred Username', 'Commission', 'Ads Viewed', 'Status', 'Date']];
+        allReferrals.forEach(function(r) {
+            rows.push([r.referrer_id, r.referrer_username || '', r.referred_id, r.referred_username || '', r.reward || 0, r.ads_viewed || 0, r.status, r.created_at || '']);
+        });
+        var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
+        downloadCSV('referrals_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
+        showToast('Referrals exported!', 'success');
+    } catch (e) { showToast('Export failed', 'error'); }
 }
 
 // Close modals on backdrop click
