@@ -246,3 +246,65 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     .withdrawal-stats { grid-template-columns: 1fr 1fr; }
     .fraud-stats { grid-template-columns: 1fr; }
 }
+
+/* ===== DASHBOARD ===== */
+.dash-summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 24px; }
+.dash-card { background: var(--bg2); border-radius: 12px; padding: 18px 14px; text-align: center; border: 1px solid var(--border); position: relative; overflow: hidden; }
+.dash-card::after { content: ''; position: absolute; top: 0; right: 0; width: 50px; height: 50px; border-radius: 0 0 0 50px; opacity: 0.06; }
+.dash-card:nth-child(1)::after { background: var(--blue); }
+.dash-card:nth-child(2)::after { background: var(--purple); }
+.dash-card:nth-child(3)::after { background: var(--accent); }
+.dash-card:nth-child(4)::after { background: var(--warning); }
+.dash-card:nth-child(5)::after { background: var(--accent); }
+.dash-card:nth-child(6)::after { background: var(--danger); }
+.dash-card-icon { font-size: 22px; display: block; margin-bottom: 8px; }
+.dash-card-icon.users-icon { filter: drop-shadow(0 0 6px rgba(59,130,246,0.5)); }
+.dash-card-icon.today-icon { filter: drop-shadow(0 0 6px rgba(139,92,246,0.5)); }
+.dash-card-icon.earnings-icon { filter: drop-shadow(0 0 6px rgba(34,197,94,0.5)); }
+.dash-card-icon.platform-icon { filter: drop-shadow(0 0 6px rgba(245,158,11,0.5)); }
+.dash-card-icon.payout-icon { filter: drop-shadow(0 0 6px rgba(34,197,94,0.5)); }
+.dash-card-icon.pending-icon { filter: drop-shadow(0 0 6px rgba(239,68,68,0.5)); }
+.dash-card-val { display: block; font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+.dash-card-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
+
+.chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.chart-box { background: var(--bg2); border-radius: 12px; padding: 18px; border: 1px solid var(--border); }
+.chart-box h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; color: var(--text2); }
+.chart-box canvas { width: 100% !important; max-height: 240px; }
+
+/* ===== PLATFORM CARDS ===== */
+.platform-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.platform-card { background: var(--bg2); border-radius: 12px; padding: 18px; margin-bottom: 12px; border: 1px solid var(--border); display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 14px; align-items: center; }
+.platform-card .p-name { font-weight: 700; font-size: 15px; }
+.platform-card .p-type { font-size: 11px; color: var(--text2); text-transform: uppercase; margin-top: 2px; }
+.platform-card .p-slug { font-size: 11px; color: var(--text2); font-family: monospace; background: var(--bg); padding: 2px 8px; border-radius: 4px; margin-top: 4px; display: inline-block; }
+.platform-card label { font-size: 10px; color: var(--text2); text-transform: uppercase; display: block; margin-bottom: 3px; }
+.platform-card input { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 13px; }
+.platform-card .toggle { position: relative; width: 44px; height: 24px; margin-top: 16px; }
+.platform-card .toggle input { display: none; }
+.platform-card .toggle .slider { position: absolute; inset: 0; background: var(--bg3); border-radius: 12px; cursor: pointer; transition: 0.2s; }
+.platform-card .toggle .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: 0.2s; }
+.platform-card .toggle input:checked + .slider { background: var(--accent); }
+.platform-card .toggle input:checked + .slider::before { transform: translateX(20px); }
+.platform-actions { display: flex; flex-direction: column; gap: 6px; }
+.btn-edit { padding: 7px 14px; background: rgba(59,130,246,0.15); color: var(--blue); border: 1px solid rgba(59,130,246,0.3); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.btn-edit:hover { background: var(--blue); color: #fff; }
+.btn-delete { padding: 7px 14px; background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.btn-delete:hover { background: var(--danger); color: #fff; }
+
+/* Platform Form in Modal */
+.platform-form { display: flex; flex-direction: column; gap: 12px; }
+.platform-form select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
+.platform-form textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 13px; font-family: monospace; resize: vertical; }
+.pf-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+@media (max-width: 900px) {
+    .dash-summary { grid-template-columns: repeat(3, 1fr); }
+    .chart-row { grid-template-columns: 1fr; }
+    .platform-card { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 600px) {
+    .dash-summary { grid-template-columns: repeat(2, 1fr); }
+    .platform-card { grid-template-columns: 1fr; }
+    .pf-row { grid-template-columns: 1fr; }
+}

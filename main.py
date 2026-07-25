@@ -29,6 +29,15 @@ from database import (
     log_fraud,
     get_fraud_logs,
     get_fraud_stats,
+    get_all_platforms,
+    get_platform,
+    get_platform_by_slug,
+    create_platform,
+    update_platform,
+    delete_platform,
+    get_daily_stats,
+    get_dashboard_summary,
+    record_daily_stats,
 )
 from ads_integration import get_ad
 
@@ -362,6 +371,111 @@ async def admin_fraud_stats(request: Request):
     if not stored or stored != password:
         return {"error": "Unauthorized"}
     return await get_fraud_stats()
+
+
+# ===== AD PLATFORM MANAGEMENT API =====
+
+@app.get("/api/admin/platforms")
+async def admin_get_platforms(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    platforms = await get_all_platforms()
+    return {"platforms": platforms}
+
+
+@app.post("/api/admin/platforms")
+async def admin_create_platform(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    name = data.get("name", "")
+    slug = data.get("slug", "")
+    if not name or not slug:
+        return {"error": "Name and slug required"}
+
+    existing = await get_platform_by_slug(slug)
+    if existing:
+        return {"error": "Slug already exists"}
+
+    platform_id = await create_platform(
+        name=name, slug=slug, ad_type=data.get("ad_type", "Rewarded Ad"),
+        script_code=data.get("script_code", ""), placement_id=data.get("placement_id", ""),
+        api_key=data.get("api_key", ""), rate=data.get("rate", 0.0005),
+        daily_limit=data.get("daily_limit", 50), enabled=data.get("enabled", 1),
+    )
+    return {"status": "ok", "id": platform_id}
+
+
+@app.post("/api/admin/platforms/{platform_id}")
+async def admin_update_platform(platform_id: int, request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    platform = await get_platform(platform_id)
+    if not platform:
+        return {"error": "Platform not found"}
+
+    update_data = {}
+    for key in ["name", "slug", "ad_type", "script_code", "placement_id", "api_key", "rate", "daily_limit", "enabled"]:
+        if key in data:
+            update_data[key] = data[key]
+
+    if update_data:
+        await update_platform(platform_id, **update_data)
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/platforms/{platform_id}/delete")
+async def admin_delete_platform(platform_id: int, request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    platform = await get_platform(platform_id)
+    if not platform:
+        return {"error": "Platform not found"}
+
+    await delete_platform(platform_id)
+    return {"status": "ok"}
+
+
+# ===== DASHBOARD / ANALYTICS API =====
+
+@app.get("/api/admin/dashboard")
+async def admin_dashboard(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    days = int(request.query_params.get("days", 30))
+    await record_daily_stats()
+    summary = await get_dashboard_summary()
+    daily = await get_daily_stats(days)
+    return {"summary": summary, "daily": daily}
+
+
+@app.get("/api/admin/dashboard/daily")
+async def admin_dashboard_daily(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    days = int(request.query_params.get("days", 30))
+    await record_daily_stats()
+    daily = await get_daily_stats(days)
+    return {"daily": daily}
 
 
 if __name__ == "__main__":

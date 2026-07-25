@@ -84,6 +84,37 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS ad_platforms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                slug TEXT UNIQUE NOT NULL,
+                ad_type TEXT DEFAULT 'Rewarded Ad',
+                script_code TEXT DEFAULT '',
+                placement_id TEXT DEFAULT '',
+                api_key TEXT DEFAULT '',
+                rate REAL DEFAULT 0.0005,
+                daily_limit INTEGER DEFAULT 50,
+                enabled INTEGER DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS daily_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT UNIQUE NOT NULL,
+                new_users INTEGER DEFAULT 0,
+                total_users INTEGER DEFAULT 0,
+                impressions INTEGER DEFAULT 0,
+                revenue REAL DEFAULT 0.0,
+                payouts REAL DEFAULT 0.0,
+                ad_views INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
         default_rates = [
             ("adsgream", 0.0005, 50, 1),
             ("monetag", 0.0005, 30, 1),
@@ -386,3 +417,125 @@ async def get_user_withdrawal_count_today(user_id: int) -> int:
         ) as cursor:
             row = await cursor.fetchone()
             return row[0]
+
+
+# ===== AD PLATFORM CRUD =====
+
+async def get_all_platforms() -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM ad_platforms ORDER BY created_at DESC") as cursor:
+            return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_platform(platform_id: int) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM ad_platforms WHERE id = ?", (platform_id,)) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def get_platform_by_slug(slug: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM ad_platforms WHERE slug = ?", (slug,)) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def create_platform(name: str, slug: str, ad_type: str = "Rewarded Ad", script_code: str = "", placement_id: str = "", api_key: str = "", rate: float = 0.0005, daily_limit: int = 50, enabled: int = 1) -> Optional[int]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute("""
+            INSERT INTO ad_platforms (name, slug, ad_type, script_code, placement_id, api_key, rate, daily_limit, enabled)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (name, slug, ad_type, script_code, placement_id, api_key, rate, daily_limit, enabled))
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def update_platform(platform_id: int, **kwargs):
+    async with aiosqlite.connect(DB_PATH) as db:
+        allowed = ["name", "slug", "ad_type", "script_code", "placement_id", "api_key", "rate", "daily_limit", "enabled"]
+        updates = []
+        values = []
+        for key in allowed:
+            if key in kwargs and kwargs[key] is not None:
+                updates.append(f"{key} = ?")
+                values.append(kwargs[key])
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(platform_id)
+            await db.execute(f"UPDATE ad_platforms SET {', '.join(updates)} WHERE id = ?", values)
+            await db.commit()
+
+
+async def delete_platform(platform_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM ad_platforms WHERE id = ?", (platform_id,))
+        await db.commit()
+
+
+# ===== DAILY STATS / DASHBOARD =====
+
+async def record_daily_stats():
+    today = __import__('datetime').date.today().isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        total_users_row = await db.execute("SELECT COUNT(*) FROM users")
+        total_users = (await total_users_row.fetchone())[0]
+        new_users_row = await db.execute("SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?", (today,))
+        new_users = (await new_users_row.fetchone())[0]
+        impressions_row = await db.execute("SELECT COUNT(*) FROM fraud_logs WHERE activity_type = 'ad_view' AND DATE(created_at) = ?", (today,))
+        impressions = (await impressions_row.fetchone())[0]
+        revenue_row = await db.execute("SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE status = 'approved' AND DATE(processed_at) = ?", (today,))
+        payouts = (await revenue_row.fetchone())[0]
+        ad_views_row = await db.execute("SELECT COUNT(*) FROM fraud_logs WHERE activity_type = 'ad_view' AND DATE(created_at) = ?", (today,))
+        ad_views = (await ad_views_row.fetchone())[0]
+        await db.execute("""
+            INSERT INTO daily_stats (date, new_users, total_users, impressions, revenue, payouts, ad_views)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(date) DO UPDATE SET
+                new_users = excluded.new_users, total_users = excluded.total_users,
+                impressions = excluded.impressions, revenue = excluded.revenue,
+                payouts = excluded.payouts, ad_views = excluded.ad_views
+        """, (today, new_users, total_users, impressions, 0, payouts, ad_views))
+        await db.commit()
+
+
+async def get_daily_stats(days: int = 30) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT * FROM daily_stats ORDER BY date DESC LIMIT ?", (days,)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in reversed(rows)]
+
+
+async def get_dashboard_summary() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        total_users_row = await db.execute("SELECT COUNT(*) FROM users")
+        total_users = (await total_users_row.fetchone())[0]
+        total_earnings_row = await db.execute("SELECT COALESCE(SUM(total_earned), 0) FROM users")
+        total_earnings = (await total_earnings_row.fetchone())[0]
+        today = __import__('datetime').date.today().isoformat()
+        new_today_row = await db.execute("SELECT COUNT(*) FROM users WHERE DATE(created_at) = ?", (today,))
+        new_today = (await new_today_row.fetchone())[0]
+        total_platforms_row = await db.execute("SELECT COUNT(*) FROM ad_platforms")
+        total_platforms = (await total_platforms_row.fetchone())[0]
+        active_platforms_row = await db.execute("SELECT COUNT(*) FROM ad_platforms WHERE enabled = 1")
+        active_platforms = (await active_platforms_row.fetchone())[0]
+        total_payouts_row = await db.execute("SELECT COALESCE(SUM(amount), 0) FROM withdrawals WHERE status = 'approved'")
+        total_payouts = (await total_payouts_row.fetchone())[0]
+        pending_payouts_row = await db.execute("SELECT COUNT(*), COALESCE(SUM(amount), 0) FROM withdrawals WHERE status = 'pending'")
+        pending_data = (await pending_payouts_row.fetchone())
+        return {
+            "total_users": total_users,
+            "total_earnings": total_earnings,
+            "new_today": new_today,
+            "total_platforms": total_platforms,
+            "active_platforms": active_platforms,
+            "total_payouts": total_payouts,
+            "pending_payout_count": pending_data[0],
+            "pending_payout_amount": pending_data[1],
+        }

@@ -3,6 +3,12 @@ let currentPage = 0;
 let allUsers = [];
 let currentWithdrawalFilter = '';
 let pendingWithdrawalId = null;
+let editingPlatformId = null;
+let deletingPlatformId = null;
+let userGrowthChart = null;
+let impressionsChart = null;
+let payoutsChart = null;
+let platformsPieChart = null;
 
 // ===== TOAST SYSTEM =====
 function showToast(message, type) {
@@ -60,6 +66,8 @@ async function loadDashboard() {
     await loadWithdrawals();
     await loadFraudLogs();
     loadFraudSettings();
+    await loadPlatforms();
+    await loadDashboardCharts();
 }
 
 async function loadStats() {
@@ -399,3 +407,223 @@ document.getElementById('approve-modal').addEventListener('click', function(e) {
 document.getElementById('reject-modal').addEventListener('click', function(e) {
     if (e.target === this) closeModal('reject-modal');
 });
+document.getElementById('platform-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal('platform-modal');
+});
+document.getElementById('delete-platform-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal('delete-platform-modal');
+});
+
+// ===== DASHBOARD CHARTS =====
+function formatShortDate(dateStr) {
+    var d = new Date(dateStr);
+    return (d.getMonth() + 1) + '/' + d.getDate();
+}
+
+async function loadDashboardCharts() {
+    try {
+        var resp = await fetch('/api/admin/dashboard?password=' + adminToken + '&days=30');
+        var data = await resp.json();
+        var summary = data.summary || {};
+        var daily = data.daily || [];
+
+        document.getElementById('d-total-users').textContent = summary.total_users || 0;
+        document.getElementById('d-new-today').textContent = summary.new_today || 0;
+        document.getElementById('d-total-earnings').textContent = (summary.total_earnings || 0).toFixed(4);
+        document.getElementById('d-total-platforms').textContent = summary.total_platforms || 0;
+        document.getElementById('d-total-payouts').textContent = (summary.total_payouts || 0).toFixed(4);
+        document.getElementById('d-pending-count').textContent = summary.pending_payout_count || 0;
+
+        var labels = daily.map(function(d) { return formatShortDate(d.date); });
+        var usersData = daily.map(function(d) { return d.total_users || 0; });
+        var impressionsData = daily.map(function(d) { return d.impressions || 0; });
+        var payoutsData = daily.map(function(d) { return d.payouts || 0; });
+        var adViewsData = daily.map(function(d) { return d.ad_views || 0; });
+
+        var chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(51,65,85,0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { grid: { color: 'rgba(51,65,85,0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } } } };
+
+        if (userGrowthChart) userGrowthChart.destroy();
+        userGrowthChart = new Chart(document.getElementById('chart-users'), {
+            type: 'line', data: { labels: labels, datasets: [{ label: 'Total Users', data: usersData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.4, pointRadius: 2 }] }, options: chartOpts
+        });
+
+        if (impressionsChart) impressionsChart.destroy();
+        impressionsChart = new Chart(document.getElementById('chart-impressions'), {
+            type: 'bar', data: { labels: labels, datasets: [{ label: 'Impressions', data: impressionsData, backgroundColor: 'rgba(139,92,246,0.6)', borderRadius: 4 }] }, options: chartOpts
+        });
+
+        if (payoutsChart) payoutsChart.destroy();
+        payoutsChart = new Chart(document.getElementById('chart-payouts'), {
+            type: 'line', data: { labels: labels, datasets: [{ label: 'Payouts (USDT)', data: payoutsData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.4, pointRadius: 2 }] }, options: chartOpts
+        });
+
+        if (platformsPieChart) platformsPieChart.destroy();
+        var activeCount = summary.active_platforms || 0;
+        var inactiveCount = (summary.total_platforms || 0) - activeCount;
+        platformsPieChart = new Chart(document.getElementById('chart-platforms'), {
+            type: 'doughnut', data: { labels: ['Active', 'Inactive'], datasets: [{ data: [activeCount, inactiveCount], backgroundColor: ['rgba(34,197,94,0.7)', 'rgba(239,68,68,0.5)'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11 } } } } }
+        });
+    } catch (e) { /* ignore */ }
+}
+
+// ===== AD PLATFORMS =====
+async function loadPlatforms() {
+    try {
+        var resp = await fetch('/api/admin/platforms?password=' + adminToken);
+        var data = await resp.json();
+        var platforms = data.platforms || [];
+        var container = document.getElementById('platforms-list');
+        container.innerHTML = '';
+
+        if (platforms.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:var(--text2);padding:40px;">No platforms added yet. Click "Add New Platform" to start.</div>';
+            return;
+        }
+
+        platforms.forEach(function(p) {
+            container.innerHTML += '<div class="platform-card" id="platform-' + p.id + '">' +
+                '<div><div class="p-name">' + p.name + '</div>' +
+                '<div class="p-type">' + (p.ad_type || 'Ad') + '</div>' +
+                '<div class="p-slug">' + p.slug + '</div>' +
+                (p.placement_id ? '<div style="font-size:10px;color:var(--text2);margin-top:4px;">PID: ' + p.placement_id + '</div>' : '') +
+                '</div>' +
+                '<div><label>Reward</label><input type="number" step="0.000001" value="' + p.rate + '" data-id="' + p.id + '" data-field="rate"></div>' +
+                '<div><label>Daily Limit</label><input type="number" value="' + p.daily_limit + '" data-id="' + p.id + '" data-field="daily_limit"></div>' +
+                '<div><label>Status</label><div class="toggle">' +
+                '<input type="checkbox" ' + (p.enabled ? 'checked' : '') + ' data-id="' + p.id + '" data-field="enabled">' +
+                '<span class="slider"></span></div></div>' +
+                '<div class="platform-actions">' +
+                '<button class="btn-edit" onclick="editPlatform(' + p.id + ')">&#9998; Edit</button>' +
+                '<button class="btn-delete" onclick="deletePlatform(' + p.id + ', \'' + p.name.replace(/'/g, "\\'") + '\')">&#128465; Delete</button>' +
+                '</div></div>';
+        });
+
+        container.querySelectorAll('[data-field="enabled"]').forEach(function(cb) {
+            cb.addEventListener('change', function() {
+                savePlatformInline(this.dataset.id);
+            });
+        });
+    } catch (e) { /* ignore */ }
+}
+
+async function savePlatformInline(id) {
+    var card = document.getElementById('platform-' + id);
+    if (!card) return;
+    var rate = card.querySelector('[data-field="rate"]').value;
+    var limit = card.querySelector('[data-field="daily_limit"]').value;
+    var enabled = card.querySelector('[data-field="enabled"]').checked ? 1 : 0;
+
+    await fetch('/api/admin/platforms/' + id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminToken, rate: parseFloat(rate), daily_limit: parseInt(limit), enabled: enabled }),
+    });
+    showToast('Platform updated!', 'success');
+}
+
+function openPlatformModal(platformId) {
+    editingPlatformId = platformId || null;
+    document.getElementById('pf-name').value = '';
+    document.getElementById('pf-slug').value = '';
+    document.getElementById('pf-type').value = 'Rewarded Ad';
+    document.getElementById('pf-script').value = '';
+    document.getElementById('pf-placement').value = '';
+    document.getElementById('pf-apikey').value = '';
+    document.getElementById('pf-rate').value = '0.0005';
+    document.getElementById('pf-limit').value = '50';
+    document.getElementById('pf-enabled').checked = true;
+
+    if (platformId) {
+        document.getElementById('platform-modal-title').innerHTML = '&#9998; Edit Platform';
+        fetch('/api/admin/platforms?password=' + adminToken)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var p = (data.platforms || []).find(function(x) { return x.id === platformId; });
+                if (p) {
+                    document.getElementById('pf-name').value = p.name;
+                    document.getElementById('pf-slug').value = p.slug;
+                    document.getElementById('pf-type').value = p.ad_type || 'Rewarded Ad';
+                    document.getElementById('pf-script').value = p.script_code || '';
+                    document.getElementById('pf-placement').value = p.placement_id || '';
+                    document.getElementById('pf-apikey').value = p.api_key || '';
+                    document.getElementById('pf-rate').value = p.rate;
+                    document.getElementById('pf-limit').value = p.daily_limit;
+                    document.getElementById('pf-enabled').checked = !!p.enabled;
+                }
+            });
+    } else {
+        document.getElementById('platform-modal-title').innerHTML = '&#10010; Add New Platform';
+    }
+
+    document.getElementById('platform-modal').classList.remove('hidden');
+}
+
+function editPlatform(id) {
+    openPlatformModal(id);
+}
+
+async function savePlatform() {
+    var name = document.getElementById('pf-name').value.trim();
+    var slug = document.getElementById('pf-slug').value.trim();
+    if (!name || !slug) {
+        showToast('Name and Slug are required!', 'error');
+        return;
+    }
+
+    var payload = {
+        password: adminToken,
+        name: name,
+        slug: slug,
+        ad_type: document.getElementById('pf-type').value,
+        script_code: document.getElementById('pf-script').value,
+        placement_id: document.getElementById('pf-placement').value,
+        api_key: document.getElementById('pf-apikey').value,
+        rate: parseFloat(document.getElementById('pf-rate').value) || 0.0005,
+        daily_limit: parseInt(document.getElementById('pf-limit').value) || 50,
+        enabled: document.getElementById('pf-enabled').checked ? 1 : 0,
+    };
+
+    try {
+        var url = editingPlatformId ? '/api/admin/platforms/' + editingPlatformId : '/api/admin/platforms';
+        var resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        var result = await resp.json();
+        if (result.error) {
+            showToast(result.error, 'error');
+            return;
+        }
+        closeModal('platform-modal');
+        showToast(editingPlatformId ? 'Platform updated!' : 'Platform created!', 'success');
+        loadPlatforms();
+        loadDashboardCharts();
+    } catch (e) {
+        showToast('Error saving platform', 'error');
+    }
+}
+
+function deletePlatform(id, name) {
+    deletingPlatformId = id;
+    document.getElementById('delete-platform-info').innerHTML = 'Delete platform <strong>' + name + '</strong>? This cannot be undone.';
+    document.getElementById('delete-platform-modal').classList.remove('hidden');
+}
+
+async function confirmDeletePlatform() {
+    if (!deletingPlatformId) return;
+    try {
+        await fetch('/api/admin/platforms/' + deletingPlatformId + '/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: adminToken }),
+        });
+        closeModal('delete-platform-modal');
+        showToast('Platform deleted!', 'warning');
+        loadPlatforms();
+        loadDashboardCharts();
+    } catch (e) {
+        showToast('Error deleting platform', 'error');
+    }
+    deletingPlatformId = null;
+}

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
     <link rel="stylesheet" href="/static/admin.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
     <div class="admin-app">
@@ -78,7 +79,9 @@
 
             <!-- Tab Navigation -->
             <nav class="admin-tabs">
-                <button class="admin-tab active" onclick="switchAdminTab('rates')" data-tab="rates">&#128200; Ad Rates</button>
+                <button class="admin-tab active" onclick="switchAdminTab('dashboard')" data-tab="dashboard">&#128202; Dashboard</button>
+                <button class="admin-tab" onclick="switchAdminTab('platforms')" data-tab="platforms">&#128225; Platforms</button>
+                <button class="admin-tab" onclick="switchAdminTab('rates')" data-tab="rates">&#128200; Ad Rates</button>
                 <button class="admin-tab" onclick="switchAdminTab('withdrawals')" data-tab="withdrawals">&#128179; Withdrawals</button>
                 <button class="admin-tab" onclick="switchAdminTab('fraud')" data-tab="fraud">&#128680; Fraud</button>
                 <button class="admin-tab" onclick="switchAdminTab('settings')" data-tab="settings">&#9881; Settings</button>
@@ -86,8 +89,80 @@
                 <button class="admin-tab" onclick="switchAdminTab('referrals')" data-tab="referrals">&#128640; Referrals</button>
             </nav>
 
+            <!-- Dashboard Tab (DEFAULT) -->
+            <div class="admin-panel active" id="panel-dashboard">
+                <h2>&#128202; Analytics Dashboard</h2>
+                <p class="panel-desc">Platform overview and performance metrics</p>
+
+                <div class="dash-summary">
+                    <div class="dash-card">
+                        <span class="dash-card-icon users-icon">&#128101;</span>
+                        <span class="dash-card-val" id="d-total-users">0</span>
+                        <span class="dash-card-label">Total Users</span>
+                    </div>
+                    <div class="dash-card">
+                        <span class="dash-card-icon today-icon">&#128200;</span>
+                        <span class="dash-card-val" id="d-new-today">0</span>
+                        <span class="dash-card-label">New Today</span>
+                    </div>
+                    <div class="dash-card">
+                        <span class="dash-card-icon earnings-icon">&#128176;</span>
+                        <span class="dash-card-val" id="d-total-earnings">0</span>
+                        <span class="dash-card-label">Total Earnings</span>
+                    </div>
+                    <div class="dash-card">
+                        <span class="dash-card-icon platform-icon">&#128225;</span>
+                        <span class="dash-card-val" id="d-total-platforms">0</span>
+                        <span class="dash-card-label">Platforms</span>
+                    </div>
+                    <div class="dash-card">
+                        <span class="dash-card-icon payout-icon">&#128179;</span>
+                        <span class="dash-card-val" id="d-total-payouts">0</span>
+                        <span class="dash-card-label">Total Payouts</span>
+                    </div>
+                    <div class="dash-card">
+                        <span class="dash-card-icon pending-icon">&#9203;</span>
+                        <span class="dash-card-val" id="d-pending-count">0</span>
+                        <span class="dash-card-label">Pending Payouts</span>
+                    </div>
+                </div>
+
+                <div class="chart-row">
+                    <div class="chart-box">
+                        <h3>&#128200; User Growth (Last 30 Days)</h3>
+                        <canvas id="chart-users"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h3>&#128202; Daily Impressions</h3>
+                        <canvas id="chart-impressions"></canvas>
+                    </div>
+                </div>
+                <div class="chart-row">
+                    <div class="chart-box">
+                        <h3>&#128176; Payout Trends</h3>
+                        <canvas id="chart-payouts"></canvas>
+                    </div>
+                    <div class="chart-box">
+                        <h3>&#128225; Ad Views by Platform</h3>
+                        <canvas id="chart-platforms"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ads Platforms Tab -->
+            <div class="admin-panel" id="panel-platforms">
+                <h2>&#128225; Ad Platform Manager</h2>
+                <p class="panel-desc">Add, edit, or remove ad platforms</p>
+
+                <div class="platform-header">
+                    <button class="save-btn" style="max-width:240px" onclick="openPlatformModal()">&#10010; Add New Platform</button>
+                </div>
+
+                <div id="platforms-list"></div>
+            </div>
+
             <!-- Ad Rates Tab -->
-            <div class="admin-panel active" id="panel-rates">
+            <div class="admin-panel" id="panel-rates">
                 <h2>&#128200; Ad Network Rates</h2>
                 <p class="panel-desc">Set reward rates for each ad network</p>
                 <div id="rates-list"></div>
@@ -338,6 +413,96 @@
             <div class="modal-footer">
                 <button class="modal-btn cancel" onclick="closeModal('reject-modal')">Cancel</button>
                 <button class="modal-btn confirm-reject" onclick="confirmReject()">&#10008; Reject</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Platform Modal -->
+    <div id="platform-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:520px;">
+            <div class="modal-header" style="background:rgba(59,130,246,0.08);">
+                <h3 id="platform-modal-title">&#10010; Add New Platform</h3>
+                <button class="modal-close" onclick="closeModal('platform-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="platform-form">
+                    <div class="pf-row">
+                        <div class="modal-field">
+                            <label>Platform Name *</label>
+                            <input type="text" id="pf-name" placeholder="e.g. Google AdSense">
+                        </div>
+                        <div class="modal-field">
+                            <label>Slug (unique ID) *</label>
+                            <input type="text" id="pf-slug" placeholder="e.g. google-adsense">
+                        </div>
+                    </div>
+                    <div class="modal-field">
+                        <label>Ad Type</label>
+                        <select id="pf-type">
+                            <option value="Rewarded Ad">Rewarded Ad</option>
+                            <option value="Interstitial Ad">Interstitial Ad</option>
+                            <option value="Banner Ad">Banner Ad</option>
+                            <option value="Native Ad">Native Ad</option>
+                            <option value="Pop-under">Pop-under</option>
+                            <option value="Special Offer">Special Offer</option>
+                        </select>
+                    </div>
+                    <div class="modal-field">
+                        <label>Script Code / Embed</label>
+                        <textarea id="pf-script" rows="3" placeholder="<script src='...'></script>"></textarea>
+                    </div>
+                    <div class="pf-row">
+                        <div class="modal-field">
+                            <label>Placement ID</label>
+                            <input type="text" id="pf-placement" placeholder="Placement or Zone ID">
+                        </div>
+                        <div class="modal-field">
+                            <label>API Key</label>
+                            <input type="text" id="pf-apikey" placeholder="API Key (optional)">
+                        </div>
+                    </div>
+                    <div class="pf-row">
+                        <div class="modal-field">
+                            <label>Reward Rate (USDT)</label>
+                            <input type="number" step="0.000001" id="pf-rate" value="0.0005">
+                        </div>
+                        <div class="modal-field">
+                            <label>Daily Limit</label>
+                            <input type="number" id="pf-limit" value="50">
+                        </div>
+                    </div>
+                    <div class="modal-field">
+                        <label>Status</label>
+                        <div class="toggle-row">
+                            <span class="toggle-label">Active</span>
+                            <div class="toggle">
+                                <input type="checkbox" id="pf-enabled" checked>
+                                <span class="slider"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeModal('platform-modal')">Cancel</button>
+                <button class="modal-btn confirm-approve" onclick="savePlatform()">&#128190; Save Platform</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Platform Modal -->
+    <div id="delete-platform-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-header reject-header">
+                <h3>&#128465; Delete Platform</h3>
+                <button class="modal-close" onclick="closeModal('delete-platform-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="delete-platform-info"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeModal('delete-platform-modal')">Cancel</button>
+                <button class="modal-btn confirm-reject" onclick="confirmDeletePlatform()">&#128465; Delete</button>
             </div>
         </div>
     </div>
