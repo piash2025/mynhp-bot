@@ -1,257 +1,238 @@
 /* eslint-disable no-undef */
 const tg = window.Telegram?.WebApp;
-if (tg) tg.expand();
+if (tg) {
+    tg.expand();
+    tg.setHeaderColor('#111827');
+    tg.setBackgroundColor('#0a0e17');
+}
 
+// ===== USER STATE =====
 let currentUser = null;
+let balance = 0;
+let tasksDone = 0;
+let todayEarned = 0;
+let totalEarned = 0;
+let isFarming = false;
+let farmInterval = null;
+let farmStartTime = null;
+let farmBalance = 0;
 
-// Get user data from Telegram
+// ===== INIT =====
 if (tg?.initDataUnsafe?.user) {
     currentUser = tg.initDataUnsafe.user;
-    fetch("/api/user/track", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+    document.getElementById('username').textContent = currentUser.first_name || 'User';
+    document.getElementById('user-id').textContent = '@' + (currentUser.username || 'user');
+
+    fetch('/api/user/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             user_id: currentUser.id,
             username: currentUser.username,
             first_name: currentUser.first_name,
         }),
     });
+
+    loadStats();
 }
 
-// ---- Modal ----
-function openTool(toolId) {
-    const modal = document.getElementById("tool-modal");
-    const title = document.getElementById("modal-title");
-    const body = document.getElementById("modal-body");
-    const result = document.getElementById("modal-result");
+async function loadStats() {
+    try {
+        const resp = await fetch('/api/stats');
+        const data = await resp.json();
+        document.getElementById('stat-users').textContent = data.total_users || 0;
+    } catch (e) { /* ignore */ }
+}
 
-    result.classList.add("hidden");
-    result.textContent = "";
+// ===== TAB NAVIGATION =====
+function switchTab(tabName) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
 
-    const tools = {
-        "text-reverse": {
-            title: "Text Reverse",
-            html: `
-                <textarea id="tr-input" placeholder="Type your text here..."></textarea>
-                <button class="primary" onclick="doTextReverse()">Reverse</button>
-            `,
-        },
-        "word-count": {
-            title: "Word Counter",
-            html: `
-                <textarea id="wc-input" placeholder="Paste or type your text..."></textarea>
-                <button class="primary" onclick="doWordCount()">Count</button>
-            `,
-        },
-        base64: {
-            title: "Base64 Encode / Decode",
-            html: `
-                <textarea id="b64-input" placeholder="Enter text to encode or decode..."></textarea>
-                <button class="primary" onclick="doBase64('encode')">Encode</button>
-                <button class="secondary" onclick="doBase64('decode')">Decode</button>
-            `,
-        },
-        password: {
-            title: "Password Generator",
-            html: `
-                <label>Length: <input type="number" id="pw-length" value="16" min="4" max="64"></label>
-                <label><input type="checkbox" id="pw-upper" checked> Uppercase (A-Z)</label>
-                <label><input type="checkbox" id="pw-lower" checked> Lowercase (a-z)</label>
-                <label><input type="checkbox" id="pw-numbers" checked> Numbers (0-9)</label>
-                <label><input type="checkbox" id="pw-symbols" checked> Symbols (!@#$...)</label>
-                <button class="primary" onclick="doPassword()">Generate Password</button>
-            `,
-        },
-        "qr-code": {
-            title: "QR Code Generator",
-            html: `
-                <input type="text" id="qr-input" placeholder="Enter URL or text...">
-                <button class="primary" onclick="doQRCode()">Generate QR Code</button>
-            `,
-        },
-        "json-formatter": {
-            title: "JSON Formatter",
-            html: `
-                <textarea id="json-input" placeholder='Paste JSON here...\n{"key": "value"}'></textarea>
-                <button class="primary" onclick="doJsonFormat()">Format JSON</button>
-            `,
-        },
-        "color-picker": {
-            title: "Color Picker",
-            html: `
-                <input type="color" id="cp-input" value="#3390ec">
-                <div class="color-preview" id="cp-preview" style="background:#3390ec;"></div>
-                <div class="color-hex" id="cp-hex">#3390ec</div>
-                <button class="primary" onclick="doColorCopy()">Copy HEX Value</button>
-            `,
-        },
-        lorem: {
-            title: "Lorem Ipsum Generator",
-            html: `
-                <label>Number of paragraphs: <input type="number" id="lorem-count" value="3" min="1" max="20"></label>
-                <button class="primary" onclick="doLorem()">Generate</button>
-            `,
-        },
+    document.getElementById('page-' + tabName).classList.add('active');
+    document.querySelector('[data-tab="' + tabName + '"]').classList.add('active');
+
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.impactOccurred('light');
+    }
+}
+
+// ===== AD WATCHING =====
+let currentAdNetwork = null;
+let adTimerInterval = null;
+
+function watchAd(network) {
+    currentAdNetwork = network;
+    const modal = document.getElementById('ad-modal');
+    const title = document.getElementById('ad-modal-title');
+    const timer = document.getElementById('ad-timer');
+    const footer = document.getElementById('ad-modal-footer');
+    const body = document.getElementById('ad-modal-body');
+
+    const networkNames = {
+        'adsgream': 'AdsGram',
+        'monetag': 'Monetag',
+        'adexium': 'Adexium',
+        'bonus': 'Bonus Offer',
     };
 
-    const tool = tools[toolId];
-    if (!tool) return;
+    title.textContent = 'Watching ' + (networkNames[network] || network) + ' Ad...';
+    timer.textContent = '5s';
+    footer.classList.add('hidden');
+    body.innerHTML = `
+        <div class="ad-placeholder">
+            <span>&#128250;</span>
+            <p>Ad is loading...</p>
+            <div class="ad-loading-bar">
+                <div class="ad-loading-fill"></div>
+            </div>
+        </div>
+    `;
+    modal.classList.remove('hidden');
 
-    title.textContent = tool.title;
-    body.innerHTML = tool.html;
-    modal.classList.remove("hidden");
-
-    // Color picker live preview
-    if (toolId === "color-picker") {
-        const cpInput = document.getElementById("cp-input");
-        cpInput.addEventListener("input", function (e) {
-            document.getElementById("cp-preview").style.background = e.target.value;
-            document.getElementById("cp-hex").textContent = e.target.value;
-        });
-    }
-
-    trackToolUse();
-}
-
-function closeModal() {
-    document.getElementById("tool-modal").classList.add("hidden");
-}
-
-function showResult(text) {
-    const result = document.getElementById("modal-result");
-    result.textContent = text;
-    result.classList.remove("hidden");
-}
-
-function showResultHTML(html) {
-    const result = document.getElementById("modal-result");
-    result.innerHTML = html;
-    result.classList.remove("hidden");
-}
-
-// ---- Track ----
-async function trackToolUse() {
-    if (currentUser) {
-        fetch("/api/tool/use", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ user_id: currentUser.id }),
-        });
-    }
-}
-
-// ---- Tool Functions ----
-
-function doTextReverse() {
-    const input = document.getElementById("tr-input").value;
-    showResult(input.split("").reverse().join(""));
-}
-
-function doWordCount() {
-    const input = document.getElementById("wc-input").value;
-    const words = input.trim() ? input.trim().split(/\s+/).length : 0;
-    const chars = input.length;
-    const charsNoSpace = input.replace(/\s/g, "").length;
-    const lines = input.split("\n").length;
-    const sentences = input.split(/[.!?]+/).filter((s) => s.trim()).length;
-    showResult(
-        `Words:            ${words}\n` +
-        `Characters:       ${chars}\n` +
-        `Without spaces:   ${charsNoSpace}\n` +
-        `Lines:            ${lines}\n` +
-        `Sentences:        ${sentences}`
-    );
-}
-
-function doBase64(mode) {
-    const input = document.getElementById("b64-input").value;
-    try {
-        if (mode === "encode") {
-            showResult(btoa(unescape(encodeURIComponent(input))));
-        } else {
-            showResult(decodeURIComponent(escape(atob(input))));
+    let seconds = 5;
+    adTimerInterval = setInterval(() => {
+        seconds--;
+        timer.textContent = seconds + 's';
+        if (seconds <= 0) {
+            clearInterval(adTimerInterval);
+            timer.textContent = 'Done!';
+            footer.classList.remove('hidden');
+            body.innerHTML = `
+                <div class="ad-placeholder">
+                    <span>&#9989;</span>
+                    <p>Ad completed! Ready to claim reward.</p>
+                </div>
+            `;
         }
-    } catch (e) {
-        showResult("Error: Invalid input for " + mode + "\n" + e.message);
+    }, 1000);
+
+    fetch('/api/tool/use', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser?.id, network: network }),
+    });
+}
+
+function claimReward() {
+    const reward = 0.0005;
+    balance += reward;
+    totalEarned += reward;
+    todayEarned += reward;
+    tasksDone++;
+
+    updateUI();
+
+    document.getElementById('ad-modal').classList.add('hidden');
+    clearInterval(adTimerInterval);
+
+    if (tg?.HapticFeedback) {
+        tg.HapticFeedback.notificationOccurred('success');
+    }
+
+    fetch('/api/user/balance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: currentUser?.id,
+            reward: reward,
+        }),
+    });
+}
+
+function updateUI() {
+    document.getElementById('balance').textContent = balance.toFixed(4);
+    document.getElementById('stat-tasks').textContent = tasksDone;
+    document.getElementById('stat-earned').textContent = totalEarned.toFixed(4);
+    document.getElementById('stat-today').textContent = todayEarned.toFixed(4);
+    document.getElementById('wallet-balance').textContent = balance.toFixed(4);
+    document.getElementById('farm-amount').textContent = farmBalance.toFixed(4) + ' USDT';
+}
+
+// ===== FARMING =====
+function toggleFarm() {
+    if (isFarming) {
+        stopFarming();
+    } else {
+        startFarming();
     }
 }
 
-function doPassword() {
-    const length = parseInt(document.getElementById("pw-length").value) || 16;
-    const useUpper = document.getElementById("pw-upper").checked;
-    const useLower = document.getElementById("pw-lower").checked;
-    const useNumbers = document.getElementById("pw-numbers").checked;
-    const useSymbols = document.getElementById("pw-symbols").checked;
+function startFarming() {
+    isFarming = true;
+    farmStartTime = Date.now();
+    farmBalance = 0;
 
-    let chars = "";
-    if (useUpper) chars += "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    if (useLower) chars += "abcdefghijklmnopqrstuvwxyz";
-    if (useNumbers) chars += "0123456789";
-    if (useSymbols) chars += "!@#$%^&*()_+-=[]{}|;:,.<>?";
+    const btn = document.getElementById('farm-btn');
+    btn.textContent = 'Stop Farming';
+    btn.classList.add('farming');
+    document.getElementById('farm-status').textContent = 'Farming in progress...';
 
-    if (!chars) {
-        showResult("Select at least one option!");
+    farmInterval = setInterval(() => {
+        const elapsed = Date.now() - farmStartTime;
+        const totalDuration = 4 * 60 * 60 * 1000;
+        const progress = Math.min((elapsed / totalDuration) * 100, 100);
+
+        farmBalance = (progress / 100) * 0.001;
+        document.getElementById('farm-progress').style.width = progress + '%';
+        document.getElementById('farm-amount').textContent = farmBalance.toFixed(4) + ' USDT';
+
+        const remaining = totalDuration - elapsed;
+        if (remaining > 0) {
+            const h = Math.floor(remaining / 3600000);
+            const m = Math.floor((remaining % 3600000) / 60000);
+            const s = Math.floor((remaining % 60000) / 1000);
+            document.getElementById('farm-timer').textContent =
+                String(h).padStart(2, '0') + ':' +
+                String(m).padStart(2, '0') + ':' +
+                String(s).padStart(2, '0');
+        } else {
+            stopFarming();
+            balance += farmBalance;
+            totalEarned += farmBalance;
+            farmBalance = 0;
+            updateUI();
+        }
+
+        updateUI();
+    }, 1000);
+}
+
+function stopFarming() {
+    isFarming = false;
+    clearInterval(farmInterval);
+    farmInterval = null;
+    farmStartTime = null;
+
+    if (farmBalance > 0) {
+        balance += farmBalance;
+        totalEarned += farmBalance;
+        farmBalance = 0;
+    }
+
+    const btn = document.getElementById('farm-btn');
+    btn.textContent = 'Start Farming';
+    btn.classList.remove('farming');
+    document.getElementById('farm-status').textContent = 'Not farming';
+    document.getElementById('farm-progress').style.width = '0%';
+    document.getElementById('farm-timer').textContent = '00:00:00';
+    document.getElementById('farm-amount').textContent = '0.0000 USDT';
+
+    updateUI();
+}
+
+// ===== WITHDRAW =====
+function withdraw() {
+    if (balance < 0.01) {
+        alert('Minimum withdrawal is 0.01 USDT. Current: ' + balance.toFixed(4));
         return;
     }
+    alert('Withdrawal request submitted! Processing within 24 hours.');
+}
 
-    let password = "";
-    const array = new Uint32Array(length);
-    crypto.getRandomValues(array);
-    for (let i = 0; i < length; i++) {
-        password += chars[array[i] % chars.length];
+// ===== MODAL CLOSE ON BACKDROP =====
+document.getElementById('ad-modal')?.addEventListener('click', function (e) {
+    if (e.target === this && !adTimerInterval) {
+        this.classList.add('hidden');
     }
-    showResult(password);
-}
-
-function doQRCode() {
-    const input = document.getElementById("qr-input").value;
-    if (!input) return;
-    const url =
-        "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=" +
-        encodeURIComponent(input);
-    showResultHTML(
-        `<img src="${url}" alt="QR Code" style="max-width:100%;border-radius:8px;">` +
-        `<p style="margin-top:8px;font-family:monospace;font-size:12px;word-break:break-all;">${input}</p>`
-    );
-}
-
-function doJsonFormat() {
-    const input = document.getElementById("json-input").value;
-    try {
-        const parsed = JSON.parse(input);
-        showResult(JSON.stringify(parsed, null, 2));
-    } catch (e) {
-        showResult("Invalid JSON:\n" + e.message);
-    }
-}
-
-function doColorCopy() {
-    const color = document.getElementById("cp-input").value;
-    if (navigator.clipboard) {
-        navigator.clipboard.writeText(color);
-    }
-    showResult("Copied: " + color);
-}
-
-function doLorem() {
-    const count = parseInt(document.getElementById("lorem-count").value) || 3;
-    const paragraphs = [
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-        "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.",
-        "Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
-        "Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit, sed quia consequuntur magni dolores eos qui ratione voluptatem sequi nesciunt.",
-        "Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet, consectetur, adipisci velit, sed quia non numquam eius modi tempora incidunt ut labore et dolore magnam aliquam quaerat voluptatem.",
-        "Ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit laboriosam, nisi ut aliquid ex ea commodi consequatur.",
-        "Quis autem vel eum iure reprehenderit qui in ea voluptate velit esse quam nihil molestiae consequatur, vel illum qui dolorem eum fugiat quo voluptas nulla pariatur.",
-    ];
-    let result = "";
-    for (let i = 0; i < count; i++) {
-        result += paragraphs[i % paragraphs.length] + "\n\n";
-    }
-    showResult(result.trim());
-}
-
-// Close modal on backdrop click
-document.getElementById("tool-modal")?.addEventListener("click", function (e) {
-    if (e.target === this) closeModal();
 });

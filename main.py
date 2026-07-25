@@ -9,8 +9,10 @@ from config import HOST, PORT
 from database import (
     add_or_update_user,
     get_user_count,
+    get_user,
     increment_tool_use,
     init_db,
+    update_balance,
 )
 from ads_integration import get_ad
 
@@ -65,6 +67,24 @@ async def get_ad_for_user(user_id: int, language: str = "en"):
     if ad:
         return ad
     return {"error": "No ad available"}
+
+
+@app.post("/api/user/balance")
+async def update_user_balance(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    reward = data.get("reward", 0)
+    if user_id and reward > 0:
+        await update_balance(user_id, reward)
+        user = await get_user(user_id)
+        if user:
+            return {
+                "status": "ok",
+                "balance": user.get("balance", 0),
+                "tasks_done": user.get("tasks_done", 0),
+                "total_earned": user.get("total_earned", 0),
+            }
+    return {"status": "error", "message": "user_id and reward required"}
 
 
 if __name__ == "__main__":

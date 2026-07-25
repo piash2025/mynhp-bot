@@ -13,7 +13,10 @@ async def init_db():
                 username TEXT,
                 first_name TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                tool_uses INTEGER DEFAULT 0
+                tool_uses INTEGER DEFAULT 0,
+                balance REAL DEFAULT 0.0,
+                tasks_done INTEGER DEFAULT 0,
+                total_earned REAL DEFAULT 0.0
             )
         """)
         await db.commit()
@@ -53,3 +56,16 @@ async def get_user(user_id: int) -> Optional[dict]:
         async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
             row = await cursor.fetchone()
             return dict(row) if row else None
+
+
+async def update_balance(user_id: int, reward: float):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO users (user_id, balance, tasks_done, total_earned)
+            VALUES (?, ?, 1, ?)
+            ON CONFLICT(user_id) DO UPDATE SET
+                balance = balance + ?,
+                tasks_done = tasks_done + 1,
+                total_earned = total_earned + ?
+        """, (user_id, reward, reward, reward, reward))
+        await db.commit()
