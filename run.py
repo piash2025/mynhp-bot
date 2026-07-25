@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def run_bot():
+    import asyncio
     from telegram.ext import Application
     from bot import setup_handlers
 
@@ -26,11 +27,18 @@ def run_bot():
         logger.error("BOT_TOKEN not set!")
         return
 
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
     application = Application.builder().token(BOT_TOKEN).build()
     setup_handlers(application)
 
     logger.info("Bot started polling...")
-    application.run_polling()
+
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(application.initialize())
+    loop.run_until_complete(application.start())
+    loop.run_until_complete(application.updater.start_polling(drop_pending_updates=True))
+    loop.run_forever()
 
 
 async def main():
