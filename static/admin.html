@@ -270,18 +270,62 @@
                 </div>
 
                 <div class="fraud-settings">
-                    <h3>&#128737; Anti-Cheat Settings</h3>
+                    <h3>&#128737; Security Toggle Controls</h3>
                     <div class="fraud-settings-grid">
                         <div class="setting-item">
                             <label>VPN/Proxy Blocker</label>
                             <div class="toggle-row">
                                 <span class="toggle-label" id="vpn-blocker-label">OFF</span>
                                 <label class="toggle">
-                                    <input type="checkbox" id="set-vpn-blocker" onchange="toggleFraudSetting(this)">
+                                    <input type="checkbox" id="set-vpn-blocker" onchange="updateToggleLabel(this, 'vpn-blocker-label')">
                                     <span class="slider"></span>
                                 </label>
                             </div>
-                            <small style="color:var(--text2);font-size:11px;display:block;margin-top:6px;">When ON: VPN users are blocked from using the app</small>
+                            <small class="setting-desc">Block VPN/Proxy users from earning</small>
+                        </div>
+                        <div class="setting-item">
+                            <label>InitData Check</label>
+                            <div class="toggle-row">
+                                <span class="toggle-label" id="initdata-label">ON</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="set-initdata-check" checked onchange="updateToggleLabel(this, 'initdata-label')">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <small class="setting-desc">Verify Telegram hash on login</small>
+                        </div>
+                        <div class="setting-item">
+                            <label>Single Device Login</label>
+                            <div class="toggle-row">
+                                <span class="toggle-label" id="single-device-label">OFF</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="set-single-device" onchange="updateToggleLabel(this, 'single-device-label')">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <small class="setting-desc">Logout other devices on new login</small>
+                        </div>
+                        <div class="setting-item">
+                            <label>Strict Ad Timer</label>
+                            <div class="toggle-row">
+                                <span class="toggle-label" id="strict-timer-label">ON</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="set-strict-timer" checked onchange="updateToggleLabel(this, 'strict-timer-label')">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <small class="setting-desc">Validate ad view duration server-side</small>
+                        </div>
+                        <div class="setting-item">
+                            <label>Auto Block Fraud</label>
+                            <div class="toggle-row">
+                                <span class="toggle-label" id="auto-block-label">OFF</span>
+                                <label class="toggle">
+                                    <input type="checkbox" id="set-auto-block" onchange="updateToggleLabel(this, 'auto-block-label')">
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+                            <small class="setting-desc">Auto-ban flagged users (OFF = flag only)</small>
                         </div>
                         <div class="setting-item">
                             <label>Max Ads Per Minute</label>
@@ -292,7 +336,13 @@
                             <input type="number" id="set-max-daily-withdrawals" value="3" min="1">
                         </div>
                     </div>
-                    <button class="save-btn" onclick="saveFraudSettings()">&#128190; Save Fraud Settings</button>
+                    <button class="save-btn" onclick="saveFraudSettings()">&#128190; Save Security Settings</button>
+                </div>
+
+                <!-- Flagged Users Section -->
+                <div class="fraud-section">
+                    <h3>&#9888; Flagged Users (Pending Review)</h3>
+                    <div id="flagged-users-list" class="flagged-users-container"></div>
                 </div>
 
                 <h3 class="logs-title">&#128203; Suspicious Activity Logs</h3>
@@ -583,6 +633,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=7"></script>
+    <script src="/static/admin.js?v=8"></script>
 </body>
 </html>

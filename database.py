@@ -33,10 +33,14 @@ async def init_db():
 
         for col, default in [
             ("ip_address", "''"), ("country", "''"), ("city", "''"),
-            ("is_vpn", "0"), ("is_banned", "0"), ("session_id", "''")
+            ("is_vpn", "0"), ("is_banned", "0"), ("session_id", "''"),
+            ("status", "'active'"), ("risk_reason", "''"),
         ]:
             try:
-                await db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {default}" if col in ("ip_address","country","city") else f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT {default}")
+                if col in ("ip_address", "country", "city", "status", "risk_reason"):
+                    await db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {default}")
+                else:
+                    await db.execute(f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT {default}")
             except Exception:
                 pass
 
@@ -160,6 +164,10 @@ async def init_db():
             "vpn_blocker": "0",
             "max_ads_per_minute": "10",
             "max_daily_withdrawals": "3",
+            "enable_initdata_check": "1",
+            "enable_single_device_login": "0",
+            "enable_strict_timer": "1",
+            "auto_block_enabled": "0",
         }
         for key, value in defaults.items():
             await db.execute("""
@@ -715,14 +723,39 @@ async def update_user_ip(user_id: int, ip_address: str, country: str = "", city:
 
 async def ban_user(user_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (user_id,))
+        await db.execute("UPDATE users SET is_banned = 1, status = 'banned' WHERE user_id = ?", (user_id,))
         await db.commit()
 
 
 async def unban_user(user_id: int):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("UPDATE users SET is_banned = 0 WHERE user_id = ?", (user_id,))
+        await db.execute("UPDATE users SET is_banned = 0, status = 'active' WHERE user_id = ?", (user_id,))
         await db.commit()
+
+
+async def set_user_status(user_id: int, status: str, risk_reason: str = ""):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET status = ?, risk_reason = ? WHERE user_id = ?", (status, risk_reason, user_id))
+        await db.commit()
+
+
+async def flag_user(user_id: int, reason: str):
+    auto_block = (await get_admin_setting("auto_block_enabled")) == "1"
+    new_status = "banned" if auto_block else "flagged"
+    new_banned = 1 if auto_block else 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET is_banned = ?, status = ?, risk_reason = ? WHERE user_id = ?",
+                         (new_banned, new_status, reason, user_id))
+        await db.commit()
+
+
+async def get_flagged_users() -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, username, first_name, ip_address, country, city, is_vpn, status, risk_reason, created_at FROM users WHERE status = 'flagged' ORDER BY created_at DESC"
+        ) as cursor:
+            return [dict(r) for r in await cursor.fetchall()]
 
 
 async def get_users_by_ip(ip_address: str) -> List[dict]:

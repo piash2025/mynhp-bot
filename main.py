@@ -56,6 +56,9 @@ from database import (
     get_all_referrals,
     flag_referral,
     auto_flag_same_ip_referrals,
+    flag_user,
+    set_user_status,
+    get_flagged_users,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -99,6 +102,9 @@ async def check_user_banned(user_id: int):
 
 
 async def check_user_session(user_id: int, session_id: str) -> bool:
+    single_device = await get_admin_setting("enable_single_device_login")
+    if single_device != "1":
+        return True
     return await verify_session(user_id, session_id)
 
 
@@ -172,8 +178,9 @@ async def track_user(request: Request):
     if not user_id:
         return {"status": "error", "message": "user_id required"}
 
-    # Silent Telegram initData hash verification (no block — just trust the user_id from frontend)
-    if init_data:
+    # Silent Telegram initData hash verification
+    initdata_check = await get_admin_setting("enable_initdata_check")
+    if initdata_check == "1" and init_data:
         verified_user = verify_telegram_initdata(init_data)
         if verified_user and verified_user.get("id"):
             user_id = verified_user["id"]
@@ -194,6 +201,7 @@ async def track_user(request: Request):
             user = await get_user(user_id)
             uname = user.get("username", "") if user else ""
             await log_fraud(user_id, uname, "vpn_detected", f"VPN/Proxy detected from {geo['country']}", ip, "medium")
+            await flag_user(user_id, f"VPN/Proxy detected from {geo['country']}")
 
     user = await get_user(user_id)
     if user and user.get("is_banned"):
@@ -263,14 +271,16 @@ async def update_user_balance(request: Request):
             return BANNED_RESPONSE
 
         # Invisible time validation — block cheaters who skip ad wait
-        min_ad_seconds = 4
-        start_time = _ad_start_times.get(user_id)
-        if start_time:
-            elapsed = time.time() - start_time
-            if elapsed < min_ad_seconds:
+        strict_timer = await get_admin_setting("enable_strict_timer")
+        if strict_timer == "1":
+            min_ad_seconds = 4
+            start_time = _ad_start_times.get(user_id)
+            if start_time:
+                elapsed = time.time() - start_time
+                if elapsed < min_ad_seconds:
+                    _ad_start_times.pop(user_id, None)
+                    return {"status": "error", "message": "Too fast. Please wait for the ad to finish.", "time_reject": True}
                 _ad_start_times.pop(user_id, None)
-                return {"status": "error", "message": "Too fast. Please wait for the ad to finish.", "time_reject": True}
-            _ad_start_times.pop(user_id, None)
 
         # VPN soft warning
         ip = extract_ip(request)
@@ -414,7 +424,7 @@ async def admin_update_settings(request: Request):
     if not stored or stored != password:
         return {"error": "Unauthorized"}
 
-    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral"]:
+    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral", "enable_initdata_check", "enable_single_device_login", "enable_strict_timer", "auto_block_enabled"]:
         if key in data and data[key]:
             await set_admin_setting(key, str(data[key]))
     return {"status": "ok"}
@@ -742,6 +752,47 @@ async def admin_unban_user(request: Request):
         return {"error": "user_id required"}
 
     await unban_user(user_id)
+    return {"status": "ok"}
+
+
+# ===== FLAGGED USERS / SILENT MONITORING =====
+
+@app.get("/api/admin/flagged-users")
+async def admin_flagged_users(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    users = await get_flagged_users()
+    return {"flagged_users": users}
+
+
+@app.post("/api/admin/flag-user")
+async def admin_flag_user_endpoint(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    user_id = data.get("user_id")
+    reason = data.get("reason", "Suspicious activity")
+    if not user_id:
+        return {"error": "user_id required"}
+    await flag_user(user_id, reason)
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/dismiss-flag")
+async def admin_dismiss_flag(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+    user_id = data.get("user_id")
+    if not user_id:
+        return {"error": "user_id required"}
+    await set_user_status(user_id, "active", "")
     return {"status": "ok"}
 
 

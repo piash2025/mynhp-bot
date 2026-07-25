@@ -70,6 +70,7 @@ async function loadDashboard() {
     await loadFraudLogs();
     loadFraudSettings();
     loadFraudIPGroups();
+    loadFlaggedUsers();
     await loadPlatforms();
     await loadDashboardCharts();
     loadReferralSummary();
@@ -222,7 +223,9 @@ function renderUsers(users) {
         var flag = u.country ? getFlag(u.country) : '';
         var location = (u.country || '-') + (u.city ? ', ' + u.city : '');
         var vpnBadge = u.is_vpn ? '<span class="badge badge-high">VPN</span>' : '<span style="color:var(--text2)">-</span>';
-        var banBadge = u.is_banned ? '<span class="badge badge-rejected">BANNED</span>' : '<span style="color:var(--accent)">Active</span>';
+        var statusBadge = u.is_banned ? '<span class="badge badge-rejected">BANNED</span>'
+            : (u.status === 'flagged' ? '<span class="badge badge-pending">FLAGGED</span>'
+            : '<span style="color:var(--accent)">Active</span>');
         var banBtn = u.is_banned
             ? '<button class="btn-unban" onclick="unbanUser(' + u.user_id + ')">&#10010; Unban</button>'
             : '<button class="btn-ban" onclick="banUser(' + u.user_id + ')">&#128683; Ban</button>';
@@ -236,7 +239,7 @@ function renderUsers(users) {
             '<td style="font-family:monospace;font-size:11px;">' + (u.ip_address || '-') + '</td>' +
             '<td>' + flag + ' ' + location + '</td>' +
             '<td>' + vpnBadge + '</td>' +
-            '<td>' + banBadge + '</td>' +
+            '<td>' + statusBadge + '</td>' +
             '<td>' + banBtn + '</td></tr>';
     });
 }
@@ -423,23 +426,33 @@ function loadFraudSettings() {
     fetch('/api/admin/settings?password=' + adminToken)
         .then(function(r) { return r.json(); })
         .then(function(settings) {
-            var vpnOn = settings.vpn_blocker === '1';
-            document.getElementById('set-vpn-blocker').checked = vpnOn;
-            var label = document.getElementById('vpn-blocker-label');
-            if (label) {
-                label.textContent = vpnOn ? 'ON' : 'OFF';
-                label.style.color = vpnOn ? 'var(--accent)' : 'var(--text)';
-            }
+            setToggle('set-vpn-blocker', 'vpn-blocker-label', settings.vpn_blocker === '1');
+            setToggle('set-initdata-check', 'initdata-label', settings.enable_initdata_check !== '0');
+            setToggle('set-single-device', 'single-device-label', settings.enable_single_device_login === '1');
+            setToggle('set-strict-timer', 'strict-timer-label', settings.enable_strict_timer !== '0');
+            setToggle('set-auto-block', 'auto-block-label', settings.auto_block_enabled === '1');
             document.getElementById('set-max-ads-minute').value = settings.max_ads_per_minute || 10;
             document.getElementById('set-max-daily-withdrawals').value = settings.max_daily_withdrawals || 3;
         })
         .catch(function() {});
 }
 
-function toggleFraudSetting(checkbox) {
-    var label = document.getElementById('vpn-blocker-label');
-    if (label) label.textContent = checkbox.checked ? 'ON' : 'OFF';
-    if (label) label.style.color = checkbox.checked ? 'var(--accent)' : 'var(--text)';
+function setToggle(inputId, labelId, isOn) {
+    var input = document.getElementById(inputId);
+    var label = document.getElementById(labelId);
+    if (input) input.checked = isOn;
+    if (label) {
+        label.textContent = isOn ? 'ON' : 'OFF';
+        label.style.color = isOn ? 'var(--accent)' : 'var(--text)';
+    }
+}
+
+function updateToggleLabel(checkbox, labelId) {
+    var label = document.getElementById(labelId);
+    if (label) {
+        label.textContent = checkbox.checked ? 'ON' : 'OFF';
+        label.style.color = checkbox.checked ? 'var(--accent)' : 'var(--text)';
+    }
 }
 
 async function saveFraudSettings() {
@@ -450,19 +463,77 @@ async function saveFraudSettings() {
             body: JSON.stringify({
                 password: adminToken,
                 vpn_blocker: document.getElementById('set-vpn-blocker').checked ? '1' : '0',
+                enable_initdata_check: document.getElementById('set-initdata-check').checked ? '1' : '0',
+                enable_single_device_login: document.getElementById('set-single-device').checked ? '1' : '0',
+                enable_strict_timer: document.getElementById('set-strict-timer').checked ? '1' : '0',
+                auto_block_enabled: document.getElementById('set-auto-block').checked ? '1' : '0',
                 max_ads_per_minute: document.getElementById('set-max-ads-minute').value,
                 max_daily_withdrawals: document.getElementById('set-max-daily-withdrawals').value,
             }),
         });
         var data = await resp.json();
         if (data.status === 'ok') {
-            showToast('Fraud settings saved!', 'success');
+            showToast('Security settings saved!', 'success');
         } else {
             showToast('Failed to save settings', 'error');
         }
     } catch (e) {
         showToast('Failed to save settings', 'error');
     }
+}
+
+// ===== FLAGGED USERS =====
+async function loadFlaggedUsers() {
+    try {
+        var resp = await fetch('/api/admin/flagged-users?password=' + adminToken);
+        var data = await resp.json();
+        var users = data.flagged_users || [];
+        var container = document.getElementById('flagged-users-list');
+        container.innerHTML = '';
+        if (users.length === 0) {
+            container.innerHTML = '<div class="fraud-empty">No flagged users — system clean</div>';
+            return;
+        }
+        users.forEach(function(u) {
+            var flag = u.country ? getFlag(u.country) : '';
+            var date = u.created_at ? new Date(u.created_at).toLocaleDateString() : '-';
+            container.innerHTML += '<div class="flagged-user-card">' +
+                '<div class="flagged-user-info">' +
+                '<div class="flagged-user-name">' + (u.username ? '@' + u.username : '#' + u.user_id) + ' &middot; ' + (u.first_name || '') + '</div>' +
+                '<div class="flagged-user-meta">' + flag + ' ' + (u.ip_address || 'No IP') + ' &middot; Joined ' + date + '</div>' +
+                '<div class="flagged-user-reason">&#9888; ' + (u.risk_reason || 'Suspicious activity') + '</div>' +
+                '</div>' +
+                '<div class="flagged-user-actions">' +
+                '<button class="btn-flag-dismiss" onclick="dismissFlag(' + u.user_id + ')">&#10003; Dismiss</button>' +
+                '<button class="btn-flag-ban" onclick="banFromFlag(' + u.user_id + ')">&#128683; Ban</button>' +
+                '</div></div>';
+        });
+    } catch (e) { /* ignore */ }
+}
+
+function dismissFlag(userId) {
+    fetch('/api/admin/dismiss-flag', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminToken, user_id: userId }),
+    }).then(function() {
+        showToast('Flag dismissed — user cleared', 'success');
+        loadFlaggedUsers();
+        loadStats();
+    });
+}
+
+function banFromFlag(userId) {
+    if (!confirm('Ban this user?')) return;
+    fetch('/api/admin/ban-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminToken, user_id: userId }),
+    }).then(function() {
+        showToast('User banned!', 'warning');
+        loadFlaggedUsers();
+        loadStats();
+    });
 }
 
 // ===== FRAUD IP GROUPS =====
