@@ -282,6 +282,11 @@ function switchTab(tabName) {
     document.getElementById('page-' + tabName).classList.add('active');
     document.querySelector('[data-tab="' + tabName + '"]').classList.add('active');
 
+    if (tabName === 'settings' && currentUser) {
+        loadPasswordStatus();
+        load2FAStatus();
+    }
+
     if (tg?.HapticFeedback) {
         tg.HapticFeedback.impactOccurred('light');
     }
@@ -530,3 +535,93 @@ document.getElementById('ad-modal')?.addEventListener('click', function (e) {
         this.classList.add('hidden');
     }
 });
+
+// ===== PASSWORD & 2FA =====
+function changePassword() {
+    var current = document.getElementById('pw-current').value;
+    var newPw = document.getElementById('pw-new').value;
+    var confirm = document.getElementById('pw-confirm').value;
+    if (newPw.length < 6) { alert('Password must be at least 6 characters'); return; }
+    if (newPw !== confirm) { alert('Passwords do not match'); return; }
+    fetch('/api/user/set-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id, password: newPw, session_id: userSessionId }),
+    }).then(r => r.json()).then(data => {
+        if (data.error) { alert(data.error); return; }
+        alert('Password saved!');
+        document.getElementById('pw-current').value = '';
+        document.getElementById('pw-new').value = '';
+        document.getElementById('pw-confirm').value = '';
+        loadPasswordStatus();
+    }).catch(() => {});
+}
+
+function loadPasswordStatus() {
+    fetch('/api/user/has-password?user_id=' + currentUser.id).then(r => r.json()).then(data => {
+        var el = document.getElementById('password-status');
+        if (data.has_password) {
+            el.innerHTML = '<span>&#10003;</span><p>Password is set</p>';
+        }
+    }).catch(() => {});
+}
+
+function setup2FA() {
+    fetch('/api/user/2fa/setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id, session_id: userSessionId }),
+    }).then(r => r.json()).then(data => {
+        if (data.error) { alert(data.error); return; }
+        document.getElementById('2fa-secret').textContent = data.secret;
+        document.getElementById('2fa-qr').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(data.otpauth_url);
+        document.getElementById('2fa-setup-area').classList.remove('hidden');
+        document.getElementById('2fa-setup-btn').classList.add('hidden');
+    }).catch(() => {});
+}
+
+function verify2FA() {
+    var code = document.getElementById('2fa-code').value.trim();
+    if (code.length !== 6) { alert('Enter 6-digit code'); return; }
+    fetch('/api/user/2fa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id, code: code, session_id: userSessionId }),
+    }).then(r => r.json()).then(data => {
+        if (data.error) { alert(data.error); return; }
+        alert('2FA enabled!');
+        document.getElementById('2fa-setup-area').classList.add('hidden');
+        load2FAStatus();
+    }).catch(() => {});
+}
+
+function disable2FA() {
+    var pw = prompt('Enter your password to disable 2FA:');
+    if (!pw) return;
+    fetch('/api/user/2fa/disable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: currentUser.id, password: pw, session_id: userSessionId }),
+    }).then(r => r.json()).then(data => {
+        if (data.error) { alert(data.error); return; }
+        alert('2FA disabled');
+        load2FAStatus();
+    }).catch(() => {});
+}
+
+function load2FAStatus() {
+    fetch('/api/user/2fa/status?user_id=' + currentUser.id + '&session_id=' + userSessionId).then(r => r.json()).then(data => {
+        var el = document.getElementById('2fa-status');
+        var setupBtn = document.getElementById('2fa-setup-btn');
+        var disableBtn = document.getElementById('2fa-disable-btn');
+        if (data.enabled) {
+            el.innerHTML = '<span>&#10003;</span><p>2FA is enabled</p>';
+            setupBtn.classList.add('hidden');
+            disableBtn.classList.remove('hidden');
+        } else {
+            el.innerHTML = '<span>&#128737;</span><p>2FA is not enabled</p>';
+            setupBtn.classList.remove('hidden');
+            disableBtn.classList.add('hidden');
+        }
+    }).catch(() => {});
+}

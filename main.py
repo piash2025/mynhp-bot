@@ -3,6 +3,9 @@ import hashlib
 import hmac
 import time
 import json
+import struct
+import base64
+import os
 import urllib.parse
 
 from fastapi import FastAPI, Request
@@ -83,9 +86,43 @@ from database import (
     delete_admin_user,
     log_admin_action,
     get_admin_audit_logs,
+    set_user_password,
+    verify_user_password,
+    has_user_password,
+    set_user_2fa,
+    get_user_2fa,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
+
+
+# ===== TOTP (2FA) =====
+
+def generate_totp_secret() -> str:
+    return base64.b32encode(os.urandom(20)).decode('utf-8')
+
+
+def generate_totp_code(secret: str, time_step: int = 30) -> str:
+    key = base64.b32decode(secret, casefold=True)
+    counter = int(time.time()) // time_step
+    msg = struct.pack('>Q', counter)
+    h = hmac.new(key, msg, hashlib.sha1).digest()
+    offset = h[-1] & 0x0f
+    code = struct.unpack('>I', h[offset:offset+4])[0] & 0x7fffffff
+    return str(code % 1000000).zfill(6)
+
+
+def verify_totp_code(secret: str, code: str, window: int = 1) -> bool:
+    for offset in range(-window, window + 1):
+        key = base64.b32decode(secret, casefold=True)
+        counter = (int(time.time()) // 30) + offset
+        msg = struct.pack('>Q', counter)
+        h = hmac.new(key, msg, hashlib.sha1).digest()
+        off = h[-1] & 0x0f
+        gen_code = struct.unpack('>I', h[off:off+4])[0] & 0x7fffffff
+        if str(gen_code % 1000000).zfill(6) == code:
+            return True
+    return False
 
 
 # ===== RBAC AUTH SYSTEM =====
@@ -1143,6 +1180,108 @@ async def list_audit_logs(request: Request):
     page = int(request.query_params.get("page", 1))
     search = request.query_params.get("search", "")
     return await get_admin_audit_logs(page=page, search=search)
+
+
+# ===== USER PASSWORD & 2FA =====
+
+@app.post("/api/user/set-password")
+async def user_set_password(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    password = data.get("password", "")
+    session_id = data.get("session_id", "")
+    if not user_id or len(password) < 6:
+        return {"error": "Password must be at least 6 characters"}
+    if not await check_user_session(user_id, session_id):
+        return SESSION_EXPIRED_RESPONSE
+    await set_user_password(user_id, password)
+    return {"status": "ok"}
+
+
+@app.post("/api/user/verify-password")
+async def user_verify_password(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    password = data.get("password", "")
+    session_id = data.get("session_id", "")
+    if not user_id or not password:
+        return {"error": "Invalid request"}
+    if not await check_user_session(user_id, session_id):
+        return SESSION_EXPIRED_RESPONSE
+    ok = await verify_user_password(user_id, password)
+    if not ok:
+        return {"error": "Wrong password"}
+    return {"status": "ok"}
+
+
+@app.get("/api/user/2fa/status")
+async def user_2fa_status(request: Request):
+    user_id = request.query_params.get("user_id", "")
+    session_id = request.query_params.get("session_id", "")
+    if not user_id:
+        return {"error": "Invalid request"}
+    if not await check_user_session(int(user_id), session_id):
+        return SESSION_EXPIRED_RESPONSE
+    return await get_user_2fa(int(user_id))
+
+
+@app.post("/api/user/2fa/setup")
+async def user_2fa_setup(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    session_id = data.get("session_id", "")
+    if not user_id:
+        return {"error": "Invalid request"}
+    if not await check_user_session(user_id, session_id):
+        return SESSION_EXPIRED_RESPONSE
+    secret = generate_totp_secret()
+    await set_user_2fa(user_id, secret, enabled=False)
+    otpauth_url = f"otpauth://totp/mynhp:{user_id}?secret={secret}&issuer=mynhp&digits=6&period=30"
+    return {"secret": secret, "otpauth_url": otpauth_url}
+
+
+@app.post("/api/user/2fa/verify")
+async def user_2fa_verify(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    code = data.get("code", "")
+    session_id = data.get("session_id", "")
+    if not user_id or not code:
+        return {"error": "Invalid request"}
+    if not await check_user_session(user_id, session_id):
+        return SESSION_EXPIRED_RESPONSE
+    info = await get_user_2fa(user_id)
+    if not info["secret"]:
+        return {"error": "2FA not set up"}
+    if verify_totp_code(info["secret"], code):
+        await set_user_2fa(user_id, info["secret"], enabled=True)
+        return {"status": "ok"}
+    return {"error": "Invalid code"}
+
+
+@app.post("/api/user/2fa/disable")
+async def user_2fa_disable(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    password = data.get("password", "")
+    session_id = data.get("session_id", "")
+    if not user_id or not password:
+        return {"error": "Invalid request"}
+    if not await check_user_session(user_id, session_id):
+        return SESSION_EXPIRED_RESPONSE
+    ok = await verify_user_password(user_id, password)
+    if not ok:
+        return {"error": "Wrong password"}
+    await set_user_2fa(user_id, "", enabled=False)
+    return {"status": "ok"}
+
+
+@app.get("/api/user/has-password")
+async def user_has_password(request: Request):
+    user_id = request.query_params.get("user_id", "")
+    if not user_id:
+        return {"has_password": False}
+    return {"has_password": await has_user_password(int(user_id))}
 
 
 if __name__ == "__main__":

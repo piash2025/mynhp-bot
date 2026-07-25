@@ -56,6 +56,15 @@ async def init_db():
         except Exception:
             pass
 
+        for col, default in [
+            ("user_password_hash", "''"), ("user_salt", "''"),
+            ("two_factor_secret", "''"), ("two_factor_enabled", "0"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {default}")
+            except Exception:
+                pass
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ad_rates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1328,3 +1337,46 @@ async def get_admin_audit_logs(page: int = 1, per_page: int = 50, search: str = 
             rows = [dict(r) for r in await c.fetchall()]
 
         return {"logs": rows, "total": total, "page": page, "per_page": per_page, "pages": max(1, -(-total // per_page))}
+
+
+# ===== USER PASSWORD & 2FA =====
+
+async def set_user_password(user_id: int, password: str) -> bool:
+    pw_hash, salt = hash_password(password)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET user_password_hash=?, user_salt=? WHERE user_id=?",
+                         (pw_hash, salt, user_id))
+        await db.commit()
+        return True
+
+
+async def verify_user_password(user_id: int, password: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT user_password_hash, user_salt FROM users WHERE user_id=?", (user_id,)) as c:
+            row = await c.fetchone()
+            if not row or not row[0]:
+                return False
+            return verify_password(password, row[0], row[1])
+
+
+async def has_user_password(user_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT user_password_hash FROM users WHERE user_id=?", (user_id,)) as c:
+            row = await c.fetchone()
+            return bool(row and row[0])
+
+
+async def set_user_2fa(user_id: int, secret: str, enabled: bool = True):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET two_factor_secret=?, two_factor_enabled=? WHERE user_id=?",
+                         (secret, "1" if enabled else "0", user_id))
+        await db.commit()
+
+
+async def get_user_2fa(user_id: int) -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT two_factor_secret, two_factor_enabled FROM users WHERE user_id=?", (user_id,)) as c:
+            row = await c.fetchone()
+            if not row:
+                return {"secret": "", "enabled": False}
+            return {"secret": row[0] or "", "enabled": row[1] == "1"}

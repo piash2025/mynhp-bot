@@ -1093,3 +1093,13 @@ body {
     color: var(--text-secondary);
     line-height: 1.4;
 }
+
+/* ===== SETTINGS ===== */
+.setting-group { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.setting-input {
+    width: 100%; padding: 12px 14px; border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; background: var(--bg-secondary); color: var(--text-primary);
+    font-size: 14px; outline: none; transition: border 0.2s;
+}
+.setting-input:focus { border-color: var(--accent); }
+.setting-input::placeholder { color: var(--text-secondary); }
