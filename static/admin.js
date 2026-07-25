@@ -443,7 +443,7 @@ async function loadDashboardCharts() {
         var payoutsData = daily.map(function(d) { return d.payouts || 0; });
         var adViewsData = daily.map(function(d) { return d.ad_views || 0; });
 
-        var chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(51,65,85,0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { grid: { color: 'rgba(51,65,85,0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } } } };
+        var chartOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: 'rgba(51,65,85,0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } }, y: { beginAtZero: true, suggestedMin: 0, grid: { color: 'rgba(51,65,85,0.3)' }, ticks: { color: '#94a3b8', font: { size: 10 } } } } };
 
         if (userGrowthChart) userGrowthChart.destroy();
         userGrowthChart = new Chart(document.getElementById('chart-users'), {
@@ -629,6 +629,55 @@ async function confirmDeletePlatform() {
         showToast('Error deleting platform', 'error');
     }
     deletingPlatformId = null;
+}
+
+// ===== EXPORT CSV =====
+function downloadCSV(filename, csvContent) {
+    var blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+function escapeCSV(val) {
+    if (val === null || val === undefined) return '';
+    var str = String(val);
+    if (str.indexOf(',') !== -1 || str.indexOf('"') !== -1 || str.indexOf('\n') !== -1) {
+        return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+}
+
+function exportWithdrawalsCSV() {
+    try {
+        var url = '/api/admin/withdrawals?password=' + adminToken;
+        if (currentWithdrawalFilter) url += '&status=' + currentWithdrawalFilter;
+        fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+            var rows = [['ID', 'User ID', 'Username', 'Amount', 'Method', 'Wallet Address', 'Status', 'Admin Note', 'Date']];
+            (data.withdrawals || []).forEach(function(w) {
+                rows.push([w.id, w.user_id, w.username || '', w.amount, w.payment_method || 'USDT', w.wallet_address || '', w.status, w.admin_note || '', w.created_at || '']);
+            });
+            var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
+            downloadCSV('withdrawals_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
+            showToast('Withdrawals exported!', 'success');
+        });
+    } catch (e) { showToast('Export failed', 'error'); }
+}
+
+function exportUsersCSV() {
+    try {
+        fetch('/api/admin/users?password=' + adminToken + '&page=0&limit=10000').then(function(r) { return r.json(); }).then(function(data) {
+            var rows = [['User ID', 'Username', 'First Name', 'Balance', 'Tasks Done', 'Total Referrals', 'Joined']];
+            (data.users || []).forEach(function(u) {
+                rows.push([u.user_id, u.username || '', u.first_name || '', u.balance || 0, u.tasks_done || 0, u.total_referrals || 0, u.created_at || '']);
+            });
+            var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
+            downloadCSV('users_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
+            showToast('Users exported!', 'success');
+        });
+    } catch (e) { showToast('Export failed', 'error'); }
 }
 
 // ===== AUTH CHECK ON LOAD =====

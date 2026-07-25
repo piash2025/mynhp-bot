@@ -36,7 +36,10 @@
         <div id="admin-dashboard" class="dashboard hidden">
             <header class="admin-header">
                 <h1>&#9881; mynhp_bot Admin</h1>
-                <button class="logout-btn" onclick="logout()">&#10140; Logout</button>
+                <div class="header-actions">
+                    <button class="quick-add-btn" onclick="openPlatformModal()">&#10010; Add Platform</button>
+                    <button class="logout-btn" onclick="logout()">&#10140; Logout</button>
+                </div>
             </header>
 
             <!-- Stats Overview -->
@@ -204,6 +207,7 @@
                     <button class="filter-btn" onclick="filterWithdrawals('pending')" data-filter="pending">Pending</button>
                     <button class="filter-btn" onclick="filterWithdrawals('approved')" data-filter="approved">Approved</button>
                     <button class="filter-btn" onclick="filterWithdrawals('rejected')" data-filter="rejected">Rejected</button>
+                    <button class="export-csv-btn" onclick="exportWithdrawalsCSV()">&#128229; Export CSV</button>
                 </div>
 
                 <div class="table-wrapper">
@@ -319,8 +323,9 @@
             <!-- Users Tab -->
             <div class="admin-panel" id="panel-users">
                 <h2>&#128101; User Management</h2>
-                <div class="search-bar">
+                <div class="search-bar-row">
                     <input type="text" id="user-search" placeholder="&#128269; Search by ID or username..." oninput="searchUsers()">
+                    <button class="export-csv-btn" onclick="exportUsersCSV()">&#128229; Export CSV</button>
                 </div>
                 <div class="table-wrapper">
                     <table class="data-table">
@@ -513,6 +518,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=3"></script>
+    <script src="/static/admin.js?v=4"></script>
 </body>
 </html>

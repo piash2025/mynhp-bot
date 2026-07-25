@@ -256,7 +256,8 @@ async def admin_users(request: Request):
         return {"error": "Unauthorized"}
 
     page = int(request.query_params.get("page", 0))
-    users = await get_all_users(page=page, limit=50)
+    limit = int(request.query_params.get("limit", 50))
+    users = await get_all_users(page=page, limit=limit)
     return {"users": users}
 
 
