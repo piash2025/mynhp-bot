@@ -250,7 +250,6 @@ async function loadSettings() {
         document.getElementById('set-min-withdraw').value = settings.min_withdraw || 0.01;
         document.getElementById('set-farm-rate').value = settings.farm_rate || 0.001;
         document.getElementById('set-farm-duration').value = settings.farm_duration_hours || 4;
-        document.getElementById('set-admin-password').value = '';
     } catch (e) { /* ignore */ }
 }
 
@@ -263,8 +262,6 @@ async function saveSettings() {
         farm_rate: document.getElementById('set-farm-rate').value,
         farm_duration_hours: document.getElementById('set-farm-duration').value,
     };
-    var newPass = document.getElementById('set-admin-password').value;
-    if (newPass) data.admin_password = newPass;
 
     await fetch('/api/admin/settings', {
         method: 'POST',
