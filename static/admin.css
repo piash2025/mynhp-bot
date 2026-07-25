@@ -198,6 +198,24 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .btn-approve:hover { background: var(--accent); color: #fff; }
 .btn-reject { padding: 6px 12px; background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
 .btn-reject:hover { background: var(--danger); color: #fff; }
+.btn-ban { padding: 6px 12px; background: rgba(239,68,68,0.15); color: var(--danger); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.btn-ban:hover { background: var(--danger); color: #fff; }
+.btn-unban { padding: 6px 12px; background: rgba(34,197,94,0.15); color: var(--accent); border: 1px solid rgba(34,197,94,0.3); border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+.btn-unban:hover { background: var(--accent); color: #fff; }
+
+/* Fraud Sections */
+.fraud-section { margin-bottom: 24px; }
+.fraud-section h3 { font-size: 15px; margin-bottom: 12px; }
+.fraud-empty { text-align: center; color: var(--text2); padding: 24px; font-size: 13px; }
+.ip-groups-container { display: flex; flex-direction: column; gap: 10px; }
+.ip-group-card { background: var(--bg2); border: 1px solid rgba(239,68,68,0.3); border-radius: 10px; padding: 14px; }
+.ip-group-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.ip-address { font-family: monospace; font-size: 13px; background: var(--bg); padding: 4px 10px; border-radius: 6px; color: var(--danger); font-weight: 600; }
+.ip-location { font-size: 12px; color: var(--text2); }
+.ip-group-users { display: flex; gap: 6px; flex-wrap: wrap; }
+.ip-user-tag { font-size: 12px; background: var(--bg3); padding: 3px 10px; border-radius: 6px; color: var(--text); }
+.vpn-user-card { background: var(--bg2); border: 1px solid rgba(59,130,246,0.3); border-radius: 10px; padding: 12px 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vpn-user-card span { font-size: 13px; }
 
 /* Withdrawal Stats */
 .withdrawal-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }

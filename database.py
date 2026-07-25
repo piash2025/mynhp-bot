@@ -21,9 +21,23 @@ async def init_db():
                 total_earned REAL DEFAULT 0.0,
                 referral_code TEXT UNIQUE,
                 referred_by INTEGER,
-                total_referrals INTEGER DEFAULT 0
+                total_referrals INTEGER DEFAULT 0,
+                ip_address TEXT DEFAULT '',
+                country TEXT DEFAULT '',
+                city TEXT DEFAULT '',
+                is_vpn INTEGER DEFAULT 0,
+                is_banned INTEGER DEFAULT 0
             )
         """)
+
+        for col, default in [
+            ("ip_address", "''"), ("country", "''"), ("city", "''"),
+            ("is_vpn", "0"), ("is_banned", "0")
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {default}" if col in ("ip_address","country","city") else f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT {default}")
+            except Exception:
+                pass
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS ad_rates (
@@ -539,3 +553,62 @@ async def get_dashboard_summary() -> dict:
             "pending_payout_count": pending_data[0],
             "pending_payout_amount": pending_data[1],
         }
+
+
+# ===== IP TRACKING & BAN =====
+
+async def update_user_ip(user_id: int, ip_address: str, country: str = "", city: str = "", is_vpn: bool = False):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            UPDATE users SET ip_address = ?, country = ?, city = ?, is_vpn = ?
+            WHERE user_id = ?
+        """, (ip_address, country, city, 1 if is_vpn else 0, user_id))
+        await db.commit()
+
+
+async def ban_user(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET is_banned = 1 WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+
+async def unban_user(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET is_banned = 0 WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+
+async def get_users_by_ip(ip_address: str) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, username, first_name, created_at, ip_address, country, city, is_vpn, is_banned FROM users WHERE ip_address = ? AND ip_address != ''",
+            (ip_address,)
+        ) as cursor:
+            return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_fraud_ip_groups() -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("""
+            SELECT ip_address, COUNT(*) as user_count,
+                   GROUP_CONCAT(user_id) as user_ids,
+                   GROUP_CONCAT(username) as usernames,
+                   country, city
+            FROM users
+            WHERE ip_address != '' AND ip_address IS NOT NULL
+            GROUP BY ip_address
+            HAVING user_count > 1
+            ORDER BY user_count DESC
+        """) as cursor:
+            return [dict(r) for r in await cursor.fetchall()]
+
+
+async def get_vpn_users() -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT user_id, username, first_name, ip_address, country, city, is_vpn, is_banned FROM users WHERE is_vpn = 1"
+        ) as cursor:
+            return [dict(r) for r in await cursor.fetchall()]

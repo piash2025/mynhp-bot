@@ -247,6 +247,26 @@
                         <span class="f-stat-num" id="f-medium">0</span>
                         <span class="f-stat-label">Medium</span>
                     </div>
+                    <div class="f-stat" style="border-color:rgba(139,92,246,0.3);">
+                        <span class="f-stat-num" id="f-ip-groups" style="color:var(--purple);">0</span>
+                        <span class="f-stat-label">Shared IPs</span>
+                    </div>
+                    <div class="f-stat" style="border-color:rgba(59,130,246,0.3);">
+                        <span class="f-stat-num" id="f-vpn-count" style="color:var(--blue);">0</span>
+                        <span class="f-stat-label">VPN Users</span>
+                    </div>
+                </div>
+
+                <!-- IP Groups Section -->
+                <div class="fraud-section">
+                    <h3>&#127760; Multi-Account Detection (Shared IPs)</h3>
+                    <div id="ip-groups-list" class="ip-groups-container"></div>
+                </div>
+
+                <!-- VPN Users Section -->
+                <div class="fraud-section">
+                    <h3>&#128274; VPN / Proxy Users</h3>
+                    <div id="vpn-users-list" class="ip-groups-container"></div>
                 </div>
 
                 <div class="fraud-settings">
@@ -337,7 +357,11 @@
                                 <th>Balance</th>
                                 <th>Tasks</th>
                                 <th>Referrals</th>
-                                <th>Joined</th>
+                                <th>IP Address</th>
+                                <th>Location</th>
+                                <th>VPN</th>
+                                <th>Status</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="users-table"></tbody>
@@ -518,6 +542,6 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=4"></script>
+    <script src="/static/admin.js?v=5"></script>
 </body>
 </html>

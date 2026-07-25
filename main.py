@@ -38,8 +38,15 @@ from database import (
     get_daily_stats,
     get_dashboard_summary,
     record_daily_stats,
+    update_user_ip,
+    ban_user,
+    unban_user,
+    get_users_by_ip,
+    get_fraud_ip_groups,
+    get_vpn_users,
 )
 from ads_integration import get_ad
+from geoip import get_geo_info, extract_ip
 
 
 def check_admin(password: str) -> bool:
@@ -83,6 +90,17 @@ async def track_user(request: Request):
         await add_or_update_user(
             user_id, data.get("username"), data.get("first_name")
         )
+        ip = extract_ip(request)
+        if ip:
+            geo = await get_geo_info(ip)
+            await update_user_ip(user_id, ip, geo["country"], geo["city"], geo["is_vpn"])
+            if geo["is_vpn"]:
+                user = await get_user(user_id)
+                uname = user.get("username", "") if user else ""
+                await log_fraud(user_id, uname, "vpn_detected", f"VPN/Proxy detected from {geo['country']}", ip, "medium")
+        user = await get_user(user_id)
+        if user and user.get("is_banned"):
+            return {"status": "error", "message": "Account banned"}
         return {"status": "ok"}
     return {"status": "error", "message": "user_id required"}
 
@@ -117,6 +135,13 @@ async def update_user_balance(request: Request):
     user_id = data.get("user_id")
     reward = data.get("reward", 0)
     if user_id and reward > 0:
+        user = await get_user(user_id)
+        if user and user.get("is_banned"):
+            return {"status": "error", "message": "Account banned"}
+        ip = extract_ip(request)
+        if ip:
+            geo = await get_geo_info(ip)
+            await update_user_ip(user_id, ip, geo["country"], geo["city"], geo["is_vpn"])
         await update_balance(user_id, reward)
         user = await get_user(user_id)
         if user:
@@ -477,6 +502,56 @@ async def admin_dashboard_daily(request: Request):
     await record_daily_stats()
     daily = await get_daily_stats(days)
     return {"daily": daily}
+
+
+# ===== BAN / UNBAN USER =====
+
+@app.post("/api/admin/ban-user")
+async def admin_ban_user(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    user_id = data.get("user_id")
+    if not user_id:
+        return {"error": "user_id required"}
+
+    await ban_user(user_id)
+    user = await get_user(user_id)
+    if user:
+        ip = user.get("ip_address", "")
+        await log_fraud(user_id, user.get("username", ""), "user_banned", "Banned by admin", ip, "high")
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/unban-user")
+async def admin_unban_user(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    user_id = data.get("user_id")
+    if not user_id:
+        return {"error": "user_id required"}
+
+    await unban_user(user_id)
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/fraud-ip-groups")
+async def admin_fraud_ip_groups(request: Request):
+    password = request.query_params.get("password", "")
+    stored = await get_admin_setting("admin_password")
+    if not stored or stored != password:
+        return {"error": "Unauthorized"}
+
+    groups = await get_fraud_ip_groups()
+    vpn_users = await get_vpn_users()
+    return {"ip_groups": groups, "vpn_users": vpn_users}
 
 
 if __name__ == "__main__":

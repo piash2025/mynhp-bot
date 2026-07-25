@@ -69,6 +69,7 @@ async function loadDashboard() {
     await loadWithdrawals();
     await loadFraudLogs();
     loadFraudSettings();
+    loadFraudIPGroups();
     await loadPlatforms();
     await loadDashboardCharts();
 }
@@ -213,7 +214,13 @@ function renderUsers(users) {
     var tbody = document.getElementById('users-table');
     tbody.innerHTML = '';
     users.forEach(function(u) {
-        var date = u.created_at ? new Date(u.created_at).toLocaleDateString() : '-';
+        var flag = u.country ? getFlag(u.country) : '';
+        var location = (u.country || '-') + (u.city ? ', ' + u.city : '');
+        var vpnBadge = u.is_vpn ? '<span class="badge badge-high">VPN</span>' : '<span style="color:var(--text2)">-</span>';
+        var banBadge = u.is_banned ? '<span class="badge badge-rejected">BANNED</span>' : '<span style="color:var(--accent)">Active</span>';
+        var banBtn = u.is_banned
+            ? '<button class="btn-unban" onclick="unbanUser(' + u.user_id + ')">&#10010; Unban</button>'
+            : '<button class="btn-ban" onclick="banUser(' + u.user_id + ')">&#128683; Ban</button>';
         tbody.innerHTML += '<tr>' +
             '<td>' + u.user_id + '</td>' +
             '<td>@' + (u.username || '-') + '</td>' +
@@ -221,7 +228,40 @@ function renderUsers(users) {
             '<td>' + (u.balance || 0).toFixed(4) + '</td>' +
             '<td>' + (u.tasks_done || 0) + '</td>' +
             '<td>' + (u.total_referrals || 0) + '</td>' +
-            '<td>' + date + '</td></tr>';
+            '<td style="font-family:monospace;font-size:11px;">' + (u.ip_address || '-') + '</td>' +
+            '<td>' + flag + ' ' + location + '</td>' +
+            '<td>' + vpnBadge + '</td>' +
+            '<td>' + banBadge + '</td>' +
+            '<td>' + banBtn + '</td></tr>';
+    });
+}
+
+function getFlag(code) {
+    if (!code || code.length !== 2) return '';
+    var offset = 127397;
+    return String.fromCodePoint(code.charCodeAt(0) + offset, code.charCodeAt(1) + offset);
+}
+
+function banUser(userId) {
+    if (!confirm('Ban this user?')) return;
+    fetch('/api/admin/ban-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminToken, user_id: userId }),
+    }).then(function(r) { return r.json(); }).then(function() {
+        showToast('User banned!', 'warning');
+        loadUsers(currentPage);
+    });
+}
+
+function unbanUser(userId) {
+    fetch('/api/admin/unban-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: adminToken, user_id: userId }),
+    }).then(function(r) { return r.json(); }).then(function() {
+        showToast('User unbanned!', 'success');
+        loadUsers(currentPage);
     });
 }
 
@@ -401,6 +441,59 @@ async function saveFraudSettings() {
         }),
     });
     showToast('Fraud settings saved!', 'success');
+}
+
+// ===== FRAUD IP GROUPS =====
+async function loadFraudIPGroups() {
+    try {
+        var resp = await fetch('/api/admin/fraud-ip-groups?password=' + adminToken);
+        var data = await resp.json();
+
+        var groups = data.ip_groups || [];
+        var vpnUsers = data.vpn_users || [];
+
+        document.getElementById('f-ip-groups').textContent = groups.length;
+        document.getElementById('f-vpn-count').textContent = vpnUsers.length;
+
+        var groupsContainer = document.getElementById('ip-groups-list');
+        groupsContainer.innerHTML = '';
+        if (groups.length === 0) {
+            groupsContainer.innerHTML = '<div class="fraud-empty">No shared IP addresses detected</div>';
+        } else {
+            groups.forEach(function(g) {
+                var userIds = (g.user_ids || '').split(',');
+                var usernames = (g.usernames || '').split(',');
+                var flag = g.country ? getFlag(g.country) : '';
+                var usersHtml = userIds.map(function(uid, i) {
+                    return '<span class="ip-user-tag">@' + (usernames[i] || uid) + '</span>';
+                }).join(' ');
+                groupsContainer.innerHTML += '<div class="ip-group-card">' +
+                    '<div class="ip-group-header">' +
+                    '<span class="ip-address">' + g.ip_address + '</span>' +
+                    '<span class="badge badge-high">' + g.user_count + ' accounts</span>' +
+                    '<span class="ip-location">' + flag + ' ' + (g.country || '?') + (g.city ? ', ' + g.city : '') + '</span>' +
+                    '</div>' +
+                    '<div class="ip-group-users">' + usersHtml + '</div>' +
+                    '</div>';
+            });
+        }
+
+        var vpnContainer = document.getElementById('vpn-users-list');
+        vpnContainer.innerHTML = '';
+        if (vpnUsers.length === 0) {
+            vpnContainer.innerHTML = '<div class="fraud-empty">No VPN/Proxy users detected</div>';
+        } else {
+            vpnUsers.forEach(function(u) {
+                var flag = u.country ? getFlag(u.country) : '';
+                vpnContainer.innerHTML += '<div class="vpn-user-card">' +
+                    '<span class="ip-address">' + (u.ip_address || '-') + '</span>' +
+                    '<span>@' + (u.username || u.user_id) + '</span>' +
+                    '<span class="ip-location">' + flag + ' ' + (u.country || '?') + (u.city ? ', ' + u.city : '') + '</span>' +
+                    '<button class="btn-ban" onclick="banUser(' + u.user_id + ')">&#128683; Ban</button>' +
+                    '</div>';
+            });
+        }
+    } catch (e) { /* ignore */ }
 }
 
 // Close modals on backdrop click
@@ -669,9 +762,9 @@ function exportWithdrawalsCSV() {
 function exportUsersCSV() {
     try {
         fetch('/api/admin/users?password=' + adminToken + '&page=0&limit=10000').then(function(r) { return r.json(); }).then(function(data) {
-            var rows = [['User ID', 'Username', 'First Name', 'Balance', 'Tasks Done', 'Total Referrals', 'Joined']];
+            var rows = [['User ID', 'Username', 'First Name', 'Balance', 'Tasks Done', 'Total Referrals', 'IP Address', 'Country', 'City', 'VPN', 'Banned', 'Joined']];
             (data.users || []).forEach(function(u) {
-                rows.push([u.user_id, u.username || '', u.first_name || '', u.balance || 0, u.tasks_done || 0, u.total_referrals || 0, u.created_at || '']);
+                rows.push([u.user_id, u.username || '', u.first_name || '', u.balance || 0, u.tasks_done || 0, u.total_referrals || 0, u.ip_address || '', u.country || '', u.city || '', u.is_vpn ? 'Yes' : 'No', u.is_banned ? 'Yes' : 'No', u.created_at || '']);
             });
             var csv = rows.map(function(r) { return r.map(escapeCSV).join(','); }).join('\n');
             downloadCSV('users_' + new Date().toISOString().slice(0, 10) + '.csv', csv);
