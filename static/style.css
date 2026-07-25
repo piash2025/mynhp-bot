@@ -711,6 +711,51 @@ body {
     transform: scale(0.98);
 }
 
+/* ===== BANNED OVERLAY ===== */
+.banned-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 14, 23, 0.98);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+    animation: fadeInBanned 0.3s ease;
+}
+@keyframes fadeInBanned { from { opacity: 0; } to { opacity: 1; } }
+.banned-card {
+    text-align: center;
+    padding: 48px 32px;
+    max-width: 380px;
+    width: 90%;
+}
+.banned-icon {
+    font-size: 72px;
+    margin-bottom: 20px;
+    animation: pulse-banned 2s infinite;
+}
+@keyframes pulse-banned {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.1); opacity: 0.8; }
+}
+.banned-card h1 {
+    font-size: 24px;
+    font-weight: 800;
+    color: #ef4444;
+    margin-bottom: 12px;
+}
+.banned-card p {
+    font-size: 14px;
+    color: #94a3b8;
+    line-height: 1.6;
+}
+.banned-sub {
+    margin-top: 8px;
+    font-size: 12px !important;
+    color: #64748b !important;
+}
+
 .hidden {
     display: none !important;
 }

@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import HOST, PORT
@@ -68,6 +68,19 @@ app = FastAPI(title="mynhp_bot", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
+BANNED_RESPONSE = JSONResponse(
+    status_code=403,
+    content={"banned": True, "status": "error", "message": "Your account has been suspended due to policy violation. Contact support for more information."}
+)
+
+
+async def check_user_banned(user_id: int):
+    user = await get_user(user_id)
+    if user and user.get("is_banned"):
+        return True
+    return False
+
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     with open("static/index.html", "r") as f:
@@ -100,7 +113,7 @@ async def track_user(request: Request):
                 await log_fraud(user_id, uname, "vpn_detected", f"VPN/Proxy detected from {geo['country']}", ip, "medium")
         user = await get_user(user_id)
         if user and user.get("is_banned"):
-            return {"status": "error", "message": "Account banned"}
+            return BANNED_RESPONSE
         return {"status": "ok"}
     return {"status": "error", "message": "user_id required"}
 
@@ -110,6 +123,8 @@ async def tool_use(request: Request):
     data = await request.json()
     user_id = data.get("user_id")
     if user_id:
+        if await check_user_banned(user_id):
+            return BANNED_RESPONSE
         await increment_tool_use(user_id)
         return {"status": "ok"}
     return {"status": "error", "message": "user_id required"}
@@ -123,6 +138,8 @@ async def stats():
 
 @app.get("/api/ad/{user_id}")
 async def get_ad_for_user(user_id: int, language: str = "en"):
+    if await check_user_banned(user_id):
+        return BANNED_RESPONSE
     ad = await get_ad(user_id, language)
     if ad:
         return ad
@@ -137,7 +154,7 @@ async def update_user_balance(request: Request):
     if user_id and reward > 0:
         user = await get_user(user_id)
         if user and user.get("is_banned"):
-            return {"status": "error", "message": "Account banned"}
+            return BANNED_RESPONSE
         ip = extract_ip(request)
         if ip:
             geo = await get_geo_info(ip)
@@ -158,6 +175,8 @@ async def update_user_balance(request: Request):
 async def get_user_info(user_id: int):
     user = await get_user(user_id)
     if user:
+        if user.get("is_banned"):
+            return BANNED_RESPONSE
         return user
     return {"error": "User not found"}
 
@@ -302,6 +321,9 @@ async def request_withdrawal(request: Request):
     user = await get_user(user_id)
     if not user:
         return {"error": "User not found"}
+
+    if user.get("is_banned"):
+        return BANNED_RESPONSE
 
     min_withdraw = float(await get_admin_setting("min_withdraw") or "0.01")
     if amount < min_withdraw:

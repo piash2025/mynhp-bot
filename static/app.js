@@ -6,6 +6,28 @@ if (tg) {
     tg.setBackgroundColor('#0a0e17');
 }
 
+// ===== BAN INTERCEPTOR =====
+function showBannedScreen() {
+    document.getElementById('banned-overlay')?.classList.remove('hidden');
+    document.querySelector('.bottom-nav')?.classList.add('hidden');
+    document.querySelector('.header')?.classList.add('hidden');
+    document.querySelectorAll('.page').forEach(function(p) { p.classList.remove('active'); });
+}
+
+const _originalFetch = window.fetch;
+window.fetch = function() {
+    return _originalFetch.apply(this, arguments).then(function(resp) {
+        if (resp.status === 403) {
+            resp.clone().json().then(function(data) {
+                if (data.banned) {
+                    showBannedScreen();
+                }
+            }).catch(function() {});
+        }
+        return resp;
+    });
+};
+
 // ===== USER STATE =====
 let currentUser = null;
 let balance = 0;
@@ -40,6 +62,12 @@ if (tg?.initDataUnsafe?.user) {
             username: currentUser.username,
             first_name: currentUser.first_name,
         }),
+    }).then(function(resp) {
+        if (resp.status === 403) {
+            resp.json().then(function(data) {
+                if (data.banned) showBannedScreen();
+            });
+        }
     });
 
     loadConfig();
@@ -96,7 +124,18 @@ async function loadUserData() {
     if (!currentUser) return;
     try {
         const resp = await fetch('/api/user/' + currentUser.id);
+        if (resp.status === 403) {
+            const data = await resp.json();
+            if (data.banned) {
+                showBannedScreen();
+                return;
+            }
+        }
         const data = await resp.json();
+        if (data.banned) {
+            showBannedScreen();
+            return;
+        }
         if (data.balance !== undefined) {
             balance = data.balance;
         }
@@ -169,6 +208,9 @@ let currentAdNetwork = null;
 let adTimerInterval = null;
 
 function watchAd(network) {
+    if (document.getElementById('banned-overlay') && !document.getElementById('banned-overlay').classList.contains('hidden')) {
+        return;
+    }
     currentAdNetwork = network;
     const modal = document.getElementById('ad-modal');
     const title = document.getElementById('ad-modal-title');
@@ -245,6 +287,12 @@ function claimReward() {
             user_id: currentUser?.id,
             reward: reward,
         }),
+    }).then(function(resp) {
+        if (resp.status === 403) {
+            resp.json().then(function(data) {
+                if (data.banned) showBannedScreen();
+            });
+        }
     });
 }
 
@@ -338,7 +386,30 @@ function withdraw() {
         alert('Minimum withdrawal is ' + min.toFixed(4) + ' USDT. Current: ' + balance.toFixed(4));
         return;
     }
-    alert('Withdrawal request submitted! Processing within 24 hours.');
+    fetch('/api/withdraw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            user_id: currentUser?.id,
+            amount: balance,
+            payment_method: 'USDT',
+            wallet_address: 'pending',
+        }),
+    }).then(function(resp) {
+        if (resp.status === 403) {
+            resp.json().then(function(data) {
+                if (data.banned) showBannedScreen();
+            });
+            return;
+        }
+        return resp.json();
+    }).then(function(data) {
+        if (data && data.status === 'ok') {
+            alert('Withdrawal request submitted! Processing within 24 hours.');
+        } else if (data && data.error) {
+            alert(data.error);
+        }
+    }).catch(function() {});
 }
 
 // ===== MODAL CLOSE ON BACKDROP =====
