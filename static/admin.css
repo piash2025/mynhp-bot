@@ -647,25 +647,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .ll-stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; }
 
 /* ===== DASHBOARD ===== */
-.dash-summary { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 24px; }
-.dash-card { background: var(--bg2); border-radius: 12px; padding: 18px 14px; text-align: center; border: 1px solid var(--border); position: relative; overflow: hidden; }
-.dash-card::after { content: ''; position: absolute; top: 0; right: 0; width: 50px; height: 50px; border-radius: 0 0 0 50px; opacity: 0.06; }
-.dash-card:nth-child(1)::after { background: var(--blue); }
-.dash-card:nth-child(2)::after { background: var(--purple); }
-.dash-card:nth-child(3)::after { background: var(--accent); }
-.dash-card:nth-child(4)::after { background: var(--warning); }
-.dash-card:nth-child(5)::after { background: var(--accent); }
-.dash-card:nth-child(6)::after { background: var(--danger); }
-.dash-card-icon { font-size: 22px; display: block; margin-bottom: 8px; }
-.dash-card-icon.users-icon { filter: drop-shadow(0 0 6px rgba(59,130,246,0.5)); }
-.dash-card-icon.today-icon { filter: drop-shadow(0 0 6px rgba(139,92,246,0.5)); }
-.dash-card-icon.earnings-icon { filter: drop-shadow(0 0 6px rgba(16,185,129,0.5)); }
-.dash-card-icon.platform-icon { filter: drop-shadow(0 0 6px rgba(245,158,11,0.5)); }
-.dash-card-icon.payout-icon { filter: drop-shadow(0 0 6px rgba(16,185,129,0.5)); }
-.dash-card-icon.pending-icon { filter: drop-shadow(0 0 6px rgba(239,68,68,0.5)); }
-.dash-card-val { display: block; font-size: 24px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
-.dash-card-label { font-size: 10px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; }
-
 .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .chart-box { background: var(--bg2); border-radius: 12px; padding: 18px; border: 1px solid var(--border); }
 .chart-box h3 { font-size: 13px; font-weight: 600; margin-bottom: 14px; color: var(--text2); }
@@ -699,7 +680,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
     .stats-row { grid-template-columns: repeat(3, 1fr); }
-    .dash-summary { grid-template-columns: repeat(3, 1fr); }
 }
 
 @media (max-width: 768px) {
@@ -736,7 +716,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     }
 
     .stats-row { grid-template-columns: repeat(2, 1fr); }
-    .dash-summary { grid-template-columns: repeat(2, 1fr); }
     .withdrawal-stats { grid-template-columns: repeat(2, 1fr); }
     .fraud-settings-grid { grid-template-columns: 1fr; }
     .rate-card { grid-template-columns: 1fr 1fr; }
@@ -749,7 +728,6 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 
 @media (max-width: 480px) {
     .stats-row { grid-template-columns: 1fr; }
-    .dash-summary { grid-template-columns: repeat(2, 1fr); }
     .withdrawal-stats { grid-template-columns: 1fr 1fr; }
     .fraud-stats { grid-template-columns: 1fr; }
     .platform-card { grid-template-columns: 1fr; }

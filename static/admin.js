@@ -812,13 +812,6 @@ async function loadDashboardCharts() {
         var summary = data.summary || {};
         var daily = data.daily || [];
 
-        document.getElementById('d-total-users').textContent = summary.total_users || 0;
-        document.getElementById('d-new-today').textContent = summary.new_today || 0;
-        document.getElementById('d-total-earnings').textContent = (summary.total_earnings || 0).toFixed(4);
-        document.getElementById('d-total-platforms').textContent = summary.total_platforms || 0;
-        document.getElementById('d-total-payouts').textContent = (summary.total_payouts || 0).toFixed(4);
-        document.getElementById('d-pending-count').textContent = summary.pending_payout_count || 0;
-
         var labels = daily.map(function(d) { return formatShortDate(d.date); });
         var usersData = daily.map(function(d) { return d.total_users || 0; });
         var impressionsData = daily.map(function(d) { return d.impressions || 0; });
