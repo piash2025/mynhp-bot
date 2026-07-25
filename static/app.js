@@ -6,6 +6,41 @@ if (tg) {
     tg.setBackgroundColor('#0a0e17');
 }
 
+// ===== SESSION MANAGEMENT =====
+function generateSessionId() {
+    return 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 15);
+}
+
+function getOrCreateSessionId() {
+    let sid = localStorage.getItem('session_id');
+    if (!sid) {
+        sid = generateSessionId();
+        localStorage.setItem('session_id', sid);
+    }
+    return sid;
+}
+
+let userSessionId = getOrCreateSessionId();
+
+function showSessionExpiredToast() {
+    const existing = document.querySelector('.session-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'session-toast';
+    toast.innerHTML = '<span>&#9888;</span> Logged out - your account was accessed from another device.';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 4000);
+}
+
+function forceLogout() {
+    showSessionExpiredToast();
+    localStorage.removeItem('session_id');
+    localStorage.removeItem('tg_user');
+    userSessionId = generateSessionId();
+    localStorage.setItem('session_id', userSessionId);
+    setTimeout(function() { location.reload(); }, 1500);
+}
+
 // ===== BAN INTERCEPTOR =====
 function showBannedScreen() {
     document.getElementById('banned-overlay')?.classList.remove('hidden');
@@ -15,13 +50,31 @@ function showBannedScreen() {
 }
 
 const _originalFetch = window.fetch;
-window.fetch = function() {
-    return _originalFetch.apply(this, arguments).then(function(resp) {
+window.fetch = function(url, opts) {
+    if (opts && opts.body && typeof opts.body === 'string' && opts.headers) {
+        try {
+            const parsed = JSON.parse(opts.body);
+            if (parsed.user_id && !parsed.session_id) {
+                parsed.session_id = userSessionId;
+                opts.body = JSON.stringify(parsed);
+            }
+        } catch (e) { /* not json */ }
+    }
+
+    if (typeof url === 'string' && url.startsWith('/api/') && !url.includes('/api/admin/') && !url.includes('/api/stats') && !url.includes('/api/config') && !url.includes('/api/fraud/log')) {
+        const separator = url.includes('?') ? '&' : '?';
+        url = url + separator + 'session_id=' + encodeURIComponent(userSessionId);
+    }
+
+    return _originalFetch.apply(this, [url, opts]).then(function(resp) {
         if (resp.status === 403) {
             resp.clone().json().then(function(data) {
-                if (data.banned) {
-                    showBannedScreen();
-                }
+                if (data.banned) showBannedScreen();
+            }).catch(function() {});
+        }
+        if (resp.status === 401) {
+            resp.clone().json().then(function(data) {
+                if (data.session_expired) forceLogout();
             }).catch(function() {});
         }
         return resp;
@@ -61,6 +114,7 @@ if (tg?.initDataUnsafe?.user) {
             user_id: currentUser.id,
             username: currentUser.username,
             first_name: currentUser.first_name,
+            session_id: userSessionId,
         }),
     }).then(function(resp) {
         if (resp.status === 403) {

@@ -26,13 +26,14 @@ async def init_db():
                 country TEXT DEFAULT '',
                 city TEXT DEFAULT '',
                 is_vpn INTEGER DEFAULT 0,
-                is_banned INTEGER DEFAULT 0
+                is_banned INTEGER DEFAULT 0,
+                session_id TEXT DEFAULT ''
             )
         """)
 
         for col, default in [
             ("ip_address", "''"), ("country", "''"), ("city", "''"),
-            ("is_vpn", "0"), ("is_banned", "0")
+            ("is_vpn", "0"), ("is_banned", "0"), ("session_id", "''")
         ]:
             try:
                 await db.execute(f"ALTER TABLE users ADD COLUMN {col} TEXT DEFAULT {default}" if col in ("ip_address","country","city") else f"ALTER TABLE users ADD COLUMN {col} INTEGER DEFAULT {default}")
@@ -612,3 +613,27 @@ async def get_vpn_users() -> List[dict]:
             "SELECT user_id, username, first_name, ip_address, country, city, is_vpn, is_banned FROM users WHERE is_vpn = 1"
         ) as cursor:
             return [dict(r) for r in await cursor.fetchall()]
+
+
+# ===== SESSION MANAGEMENT =====
+
+async def update_session_id(user_id: int, session_id: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET session_id = ? WHERE user_id = ?", (session_id, user_id))
+        await db.commit()
+
+
+async def get_session_id(user_id: int) -> Optional[str]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT session_id FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row and row[0] else None
+
+
+async def verify_session(user_id: int, session_id: str) -> bool:
+    if not session_id:
+        return False
+    stored = await get_session_id(user_id)
+    if not stored:
+        return True
+    return stored == session_id

@@ -756,6 +756,30 @@ body {
     color: #64748b !important;
 }
 
+/* ===== SESSION EXPIRED TOAST ===== */
+.session-toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(135deg, #dc2626, #ef4444);
+    color: #fff;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    z-index: 9999999;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 8px 32px rgba(220,38,38,0.4);
+    animation: slideDownToast 0.3s ease, fadeOutToast 0.3s ease 3.5s forwards;
+    max-width: 90%;
+    text-align: center;
+}
+@keyframes slideDownToast { from { transform: translateX(-50%) translateY(-20px); opacity: 0; } to { transform: translateX(-50%) translateY(0); opacity: 1; } }
+@keyframes fadeOutToast { from { opacity: 1; } to { opacity: 0; transform: translateX(-50%) translateY(-20px); } }
+
 .hidden {
     display: none !important;
 }

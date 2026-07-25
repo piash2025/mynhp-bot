@@ -44,6 +44,8 @@ from database import (
     get_users_by_ip,
     get_fraud_ip_groups,
     get_vpn_users,
+    update_session_id,
+    verify_session,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
@@ -73,12 +75,21 @@ BANNED_RESPONSE = JSONResponse(
     content={"banned": True, "status": "error", "message": "Your account has been suspended due to policy violation. Contact support for more information."}
 )
 
+SESSION_EXPIRED_RESPONSE = JSONResponse(
+    status_code=401,
+    content={"session_expired": True, "status": "error", "message": "Logged in from another device. Please log in again."}
+)
+
 
 async def check_user_banned(user_id: int):
     user = await get_user(user_id)
     if user and user.get("is_banned"):
         return True
     return False
+
+
+async def check_user_session(user_id: int, session_id: str) -> bool:
+    return await verify_session(user_id, session_id)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -99,10 +110,13 @@ async def admin_panel():
 async def track_user(request: Request):
     data = await request.json()
     user_id = data.get("user_id")
+    session_id = data.get("session_id", "")
     if user_id:
         await add_or_update_user(
             user_id, data.get("username"), data.get("first_name")
         )
+        if session_id:
+            await update_session_id(user_id, session_id)
         ip = extract_ip(request)
         if ip:
             geo = await get_geo_info(ip)
@@ -122,7 +136,10 @@ async def track_user(request: Request):
 async def tool_use(request: Request):
     data = await request.json()
     user_id = data.get("user_id")
+    session_id = data.get("session_id", "")
     if user_id:
+        if not await check_user_session(user_id, session_id):
+            return SESSION_EXPIRED_RESPONSE
         if await check_user_banned(user_id):
             return BANNED_RESPONSE
         await increment_tool_use(user_id)
@@ -137,7 +154,9 @@ async def stats():
 
 
 @app.get("/api/ad/{user_id}")
-async def get_ad_for_user(user_id: int, language: str = "en"):
+async def get_ad_for_user(user_id: int, language: str = "en", session_id: str = ""):
+    if not await check_user_session(user_id, session_id):
+        return SESSION_EXPIRED_RESPONSE
     if await check_user_banned(user_id):
         return BANNED_RESPONSE
     ad = await get_ad(user_id, language)
@@ -151,7 +170,10 @@ async def update_user_balance(request: Request):
     data = await request.json()
     user_id = data.get("user_id")
     reward = data.get("reward", 0)
+    session_id = data.get("session_id", "")
     if user_id and reward > 0:
+        if not await check_user_session(user_id, session_id):
+            return SESSION_EXPIRED_RESPONSE
         user = await get_user(user_id)
         if user and user.get("is_banned"):
             return BANNED_RESPONSE
@@ -172,11 +194,13 @@ async def update_user_balance(request: Request):
 
 
 @app.get("/api/user/{user_id}")
-async def get_user_info(user_id: int):
+async def get_user_info(user_id: int, session_id: str = ""):
     user = await get_user(user_id)
     if user:
         if user.get("is_banned"):
             return BANNED_RESPONSE
+        if session_id and not await check_user_session(user_id, session_id):
+            return SESSION_EXPIRED_RESPONSE
         return user
     return {"error": "User not found"}
 
@@ -314,9 +338,13 @@ async def request_withdrawal(request: Request):
     amount = data.get("amount", 0)
     payment_method = data.get("payment_method", "USDT")
     wallet_address = data.get("wallet_address", "")
+    session_id = data.get("session_id", "")
 
     if not user_id or not amount or not wallet_address:
         return {"error": "user_id, amount, wallet_address required"}
+
+    if not await check_user_session(user_id, session_id):
+        return SESSION_EXPIRED_RESPONSE
 
     user = await get_user(user_id)
     if not user:
