@@ -74,13 +74,71 @@ from database import (
     get_transactions,
     get_user_accounting_list,
     get_user_transaction_history,
+    verify_password,
+    create_admin_user,
+    get_admin_user_by_username,
+    get_admin_user_by_id,
+    get_all_admin_users,
+    update_admin_user,
+    delete_admin_user,
+    log_admin_action,
+    get_admin_audit_logs,
 )
 from ads_integration import get_ad
 from geoip import get_geo_info, extract_ip
 
 
+# ===== RBAC AUTH SYSTEM =====
+
+async def authenticate_admin(password: str, ip: str = "") -> dict:
+    """Authenticate via legacy admin_password OR new admin_users table.
+    Returns {admin_id, username, role, permissions} or None."""
+    stored = await get_admin_setting("admin_password")
+    if stored and stored == password:
+        return {
+            "admin_id": 0,
+            "username": "super_admin",
+            "role": "super_admin",
+            "permissions": ["manage_admins", "manage_users", "manage_platforms", "manage_rates",
+                            "process_withdrawals", "manage_fraud", "manage_settings", "view_accounting",
+                            "manage_referrals", "view_logs", "view_task_activities", "view_audit_log"],
+        }
+    admin = await get_admin_user_by_username(password)
+    if admin and verify_password(password, admin["password_hash"], admin["salt"]):
+        if admin["status"] != "active":
+            return None
+        await update_admin_user(admin["id"], last_login=time.strftime("%Y-%m-%d %H:%M:%S"))
+        return {
+            "admin_id": admin["id"],
+            "username": admin["username"],
+            "role": admin["role"],
+            "permissions": json.loads(admin["permissions"]) if admin["permissions"] else [],
+        }
+    return None
+
+
+def has_permission(admin: dict, perm: str) -> bool:
+    if not admin:
+        return False
+    if admin["role"] == "super_admin":
+        return True
+    return perm in admin.get("permissions", [])
+
+
+async def require_admin(request: Request, permission: str = None):
+    """Extract password from query params, authenticate, optionally check permission.
+    Returns (admin_info, error_response). error_response is None if OK."""
+    password = request.query_params.get("password", "")
+    admin = await authenticate_admin(password)
+    if not admin:
+        return None, {"error": "Unauthorized"}
+    if permission and not has_permission(admin, permission):
+        return None, {"error": "Forbidden", "message": f"Missing permission: {permission}"}
+    return admin, None
+
+
 def check_admin(password: str) -> bool:
-    stored = get_admin_setting.__wrapped__ if hasattr(get_admin_setting, '__wrapped__') else None
+    """Legacy sync check — kept for backward compatibility."""
     import sqlite3
     conn = sqlite3.connect("bot_users.db")
     row = conn.execute("SELECT value FROM admin_settings WHERE key='admin_password'").fetchone()
@@ -91,6 +149,11 @@ def check_admin(password: str) -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    from database import create_admin_user, get_admin_user_by_username
+    existing = await get_admin_user_by_username("admin")
+    if not existing:
+        await create_admin_user("admin", "admin@bot.local", "admin123", "super_admin")
+        print("[auth] Created default super_admin: admin / admin123")
     import asyncio
     async def weekly_login_log_cleanup():
         while True:
@@ -435,12 +498,19 @@ async def admin_login(request: Request):
     return {"status": "error", "message": "Wrong password"}
 
 
+@app.get("/api/admin/me")
+async def admin_me(request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
+    return {"admin_id": admin["admin_id"], "username": admin["username"], "role": admin["role"], "permissions": admin["permissions"]}
+
+
 @app.get("/api/admin/stats")
 async def admin_stats(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request)
+    if err:
+        return err
 
     total_users = await get_user_count()
     total_earnings = await get_total_earnings()
@@ -466,30 +536,27 @@ async def admin_stats(request: Request):
 
 @app.get("/api/admin/live-users-count")
 async def admin_live_users_count(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request)
+    if err:
+        return err
     count = await get_live_users_count(2)
     return {"live_users": count}
 
 
 @app.get("/api/admin/rates")
 async def admin_rates(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request)
+    if err:
+        return err
     return await get_all_ad_rates()
 
 
 @app.post("/api/admin/rates/{network}")
 async def admin_update_rate(network: str, request: Request):
+    admin, err = await require_admin(request, "manage_rates")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     await update_ad_rate(
         network,
@@ -502,20 +569,18 @@ async def admin_update_rate(network: str, request: Request):
 
 @app.get("/api/admin/settings")
 async def admin_get_settings(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request)
+    if err:
+        return err
     return await get_all_admin_settings()
 
 
 @app.post("/api/admin/settings")
 async def admin_update_settings(request: Request):
+    admin, err = await require_admin(request, "manage_settings")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral", "enable_initdata_check", "enable_single_device_login", "enable_strict_timer", "auto_block_enabled"]:
         if key in data and data[key]:
@@ -525,10 +590,9 @@ async def admin_update_settings(request: Request):
 
 @app.get("/api/admin/users")
 async def admin_users(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "manage_users")
+    if err:
+        return err
 
     page = int(request.query_params.get("page", 0))
     limit = int(request.query_params.get("limit", 50))
@@ -581,10 +645,9 @@ async def request_withdrawal(request: Request):
 
 @app.get("/api/admin/withdrawals")
 async def admin_get_withdrawals(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "process_withdrawals")
+    if err:
+        return err
 
     status = request.query_params.get("status", None)
     page = int(request.query_params.get("page", 0))
@@ -595,11 +658,10 @@ async def admin_get_withdrawals(request: Request):
 
 @app.post("/api/admin/withdrawals/{withdrawal_id}/approve")
 async def admin_approve_withdrawal(withdrawal_id: int, request: Request):
+    admin, err = await require_admin(request, "process_withdrawals")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     note = data.get("note", "Approved by admin")
     await update_withdrawal_status(withdrawal_id, "approved", note)
@@ -617,11 +679,10 @@ async def admin_approve_withdrawal(withdrawal_id: int, request: Request):
 
 @app.post("/api/admin/withdrawals/{withdrawal_id}/reject")
 async def admin_reject_withdrawal(withdrawal_id: int, request: Request):
+    admin, err = await require_admin(request, "process_withdrawals")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     note = data.get("note", "Rejected by admin")
     await update_withdrawal_status(withdrawal_id, "rejected", note)
@@ -632,19 +693,17 @@ async def admin_reject_withdrawal(withdrawal_id: int, request: Request):
 
 @app.get("/api/admin/referral-summary")
 async def admin_referral_summary(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "manage_referrals")
+    if err:
+        return err
     return await get_referral_summary()
 
 
 @app.get("/api/admin/referrals")
 async def admin_referrals(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "manage_referrals")
+    if err:
+        return err
 
     page = int(request.query_params.get("page", 0))
     search = request.query_params.get("search", "")
@@ -654,11 +713,10 @@ async def admin_referrals(request: Request):
 
 @app.post("/api/admin/referrals/{referral_id}/flag")
 async def admin_flag_referral(referral_id: int, request: Request):
+    admin, err = await require_admin(request, "manage_referrals")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     status = data.get("status", "flagged")
     await flag_referral(referral_id, status)
@@ -667,11 +725,10 @@ async def admin_flag_referral(referral_id: int, request: Request):
 
 @app.post("/api/admin/referrals/auto-flag-ip")
 async def admin_auto_flag_ip(request: Request):
+    admin, err = await require_admin(request, "manage_referrals")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     await auto_flag_same_ip_referrals()
     return {"status": "ok"}
@@ -696,10 +753,9 @@ async def fraud_log_endpoint(request: Request):
 
 @app.get("/api/admin/fraud-logs")
 async def admin_get_fraud_logs(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "manage_fraud")
+    if err:
+        return err
 
     page = int(request.query_params.get("page", 0))
     logs = await get_fraud_logs(page=page)
@@ -709,10 +765,9 @@ async def admin_get_fraud_logs(request: Request):
 
 @app.get("/api/admin/fraud-stats")
 async def admin_fraud_stats(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "manage_fraud")
+    if err:
+        return err
     return await get_fraud_stats()
 
 
@@ -720,21 +775,19 @@ async def admin_fraud_stats(request: Request):
 
 @app.get("/api/admin/platforms")
 async def admin_get_platforms(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request)
+    if err:
+        return err
     platforms = await get_all_platforms()
     return {"platforms": platforms}
 
 
 @app.post("/api/admin/platforms")
 async def admin_create_platform(request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     name = data.get("name", "")
     slug = data.get("slug", "")
@@ -756,11 +809,10 @@ async def admin_create_platform(request: Request):
 
 @app.post("/api/admin/platforms/{platform_id}")
 async def admin_update_platform(platform_id: int, request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     platform = await get_platform(platform_id)
     if not platform:
@@ -778,11 +830,10 @@ async def admin_update_platform(platform_id: int, request: Request):
 
 @app.post("/api/admin/platforms/{platform_id}/delete")
 async def admin_delete_platform(platform_id: int, request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     platform = await get_platform(platform_id)
     if not platform:
@@ -796,10 +847,9 @@ async def admin_delete_platform(platform_id: int, request: Request):
 
 @app.get("/api/admin/dashboard")
 async def admin_dashboard(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request)
+    if err:
+        return err
 
     days = int(request.query_params.get("days", 30))
     await record_daily_stats()
@@ -810,10 +860,9 @@ async def admin_dashboard(request: Request):
 
 @app.get("/api/admin/dashboard/daily")
 async def admin_dashboard_daily(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request)
+    if err:
+        return err
 
     days = int(request.query_params.get("days", 30))
     await record_daily_stats()
@@ -825,11 +874,10 @@ async def admin_dashboard_daily(request: Request):
 
 @app.post("/api/admin/ban-user")
 async def admin_ban_user(request: Request):
+    admin, err = await require_admin(request, "manage_users")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     user_id = data.get("user_id")
     if not user_id:
@@ -845,11 +893,10 @@ async def admin_ban_user(request: Request):
 
 @app.post("/api/admin/unban-user")
 async def admin_unban_user(request: Request):
+    admin, err = await require_admin(request, "manage_users")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     user_id = data.get("user_id")
     if not user_id:
@@ -863,21 +910,19 @@ async def admin_unban_user(request: Request):
 
 @app.get("/api/admin/flagged-users")
 async def admin_flagged_users(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "manage_fraud")
+    if err:
+        return err
     users = await get_flagged_users()
     return {"flagged_users": users}
 
 
 @app.post("/api/admin/flag-user")
 async def admin_flag_user_endpoint(request: Request):
+    admin, err = await require_admin(request, "manage_fraud")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
     user_id = data.get("user_id")
     reason = data.get("reason", "Suspicious activity")
     if not user_id:
@@ -888,11 +933,10 @@ async def admin_flag_user_endpoint(request: Request):
 
 @app.post("/api/admin/dismiss-flag")
 async def admin_dismiss_flag(request: Request):
+    admin, err = await require_admin(request, "manage_fraud")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
     user_id = data.get("user_id")
     if not user_id:
         return {"error": "user_id required"}
@@ -902,10 +946,9 @@ async def admin_dismiss_flag(request: Request):
 
 @app.get("/api/admin/fraud-ip-groups")
 async def admin_fraud_ip_groups(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "manage_fraud")
+    if err:
+        return err
 
     groups = await get_fraud_ip_groups()
     vpn_users = await get_vpn_users()
@@ -916,10 +959,9 @@ async def admin_fraud_ip_groups(request: Request):
 
 @app.get("/api/admin/login-logs")
 async def admin_login_logs(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "view_logs")
+    if err:
+        return err
 
     page = int(request.query_params.get("page", 1))
     per_page = int(request.query_params.get("per_page", 50))
@@ -936,11 +978,10 @@ async def admin_login_logs(request: Request):
 
 @app.post("/api/admin/login-logs/cleanup")
 async def admin_login_logs_cleanup(request: Request):
+    admin, err = await require_admin(request, "view_logs")
+    if err:
+        return err
     data = await request.json()
-    password = data.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
 
     enabled = data.get("enabled")
     if enabled is not None:
@@ -954,10 +995,9 @@ async def admin_login_logs_cleanup(request: Request):
 
 @app.get("/api/admin/task-activities")
 async def admin_task_activities(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "view_task_activities")
+    if err:
+        return err
 
     page = int(request.query_params.get("page", 1))
     per_page = int(request.query_params.get("per_page", 50))
@@ -974,10 +1014,9 @@ async def admin_task_activities(request: Request):
 
 @app.get("/api/admin/accounting")
 async def admin_accounting(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "view_accounting")
+    if err:
+        return err
 
     date_filter = request.query_params.get("date_filter", "")
     page = int(request.query_params.get("page", 1))
@@ -990,10 +1029,9 @@ async def admin_accounting(request: Request):
 
 @app.get("/api/admin/accounting/users")
 async def admin_accounting_users(request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "view_accounting")
+    if err:
+        return err
 
     search = request.query_params.get("search", "")
     page = int(request.query_params.get("page", 1))
@@ -1003,12 +1041,95 @@ async def admin_accounting_users(request: Request):
 
 @app.get("/api/admin/accounting/users/{user_id}/history")
 async def admin_accounting_user_history(user_id: int, request: Request):
-    password = request.query_params.get("password", "")
-    stored = await get_admin_setting("admin_password")
-    if not stored or stored != password:
-        return {"error": "Unauthorized"}
+    admin, err = await require_admin(request, "view_accounting")
+    if err:
+        return err
 
     return await get_user_transaction_history(user_id)
+
+
+# ===== ADMIN USER MANAGEMENT =====
+
+@app.get("/api/admin/admin-users")
+async def list_admin_users(request: Request):
+    admin, err = await require_admin(request, "manage_admins")
+    if err:
+        return err
+    users = await get_all_admin_users()
+    return {"admin_users": users}
+
+
+@app.post("/api/admin/admin-users")
+async def create_new_admin(request: Request):
+    admin, err = await require_admin(request, "manage_admins")
+    if err:
+        return err
+    data = await request.json()
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+    role = data.get("role", "moderator")
+    permissions = data.get("permissions", [])
+    if not username or not password:
+        return {"error": "Username and password required"}
+    result = await create_admin_user(username, email, password, role, permissions)
+    if result.get("error"):
+        return result
+    await log_admin_action(admin["admin_id"], admin["username"],
+                           f"Created admin user: {username}", f"role={role}", "")
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/admin-users/{admin_id}/update")
+async def update_existing_admin(admin_id: int, request: Request):
+    admin, err = await require_admin(request, "manage_admins")
+    if err:
+        return err
+    data = await request.json()
+    updates = {}
+    if "email" in data:
+        updates["email"] = data["email"]
+    if "role" in data:
+        updates["role"] = data["role"]
+    if "permissions" in data:
+        updates["permissions"] = data["permissions"]
+    if "status" in data:
+        updates["status"] = data["status"]
+    if "password" in data and data["password"]:
+        from database import hash_password
+        pw_hash, salt = hash_password(data["password"])
+        updates["password_hash"] = pw_hash
+        updates["salt"] = salt
+    await update_admin_user(admin_id, **updates)
+    target = await get_admin_user_by_id(admin_id)
+    await log_admin_action(admin["admin_id"], admin["username"],
+                           f"Updated admin: {target['username'] if target else admin_id}",
+                           json.dumps(list(updates.keys())), "")
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/admin-users/{admin_id}/delete")
+async def delete_existing_admin(admin_id: int, request: Request):
+    admin, err = await require_admin(request, "manage_admins")
+    if err:
+        return err
+    target = await get_admin_user_by_id(admin_id)
+    if target and target["role"] == "super_admin":
+        return {"error": "Cannot delete super admin"}
+    await delete_admin_user(admin_id)
+    await log_admin_action(admin["admin_id"], admin["username"],
+                           f"Deleted admin: {target['username'] if target else admin_id}", "", "")
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/audit-logs")
+async def list_audit_logs(request: Request):
+    admin, err = await require_admin(request, "view_audit_log")
+    if err:
+        return err
+    page = int(request.query_params.get("page", 1))
+    search = request.query_params.get("search", "")
+    return await get_admin_audit_logs(page=page, search=search)
 
 
 if __name__ == "__main__":

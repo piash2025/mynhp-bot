@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=17">
+    <link rel="stylesheet" href="/static/admin.css?v=18">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -91,6 +91,10 @@
                     <a class="sidebar-item" data-tab="accounting" onclick="switchAdminTab('accounting')">
                         <span class="sidebar-icon">&#128179;</span>
                         <span class="sidebar-label">Accounting</span>
+                    </a>
+                    <a class="sidebar-item" data-tab="adminusers" onclick="switchAdminTab('adminusers')" data-min-role="super_admin">
+                        <span class="sidebar-icon">&#128100;</span>
+                        <span class="sidebar-label">Admin Users</span>
                     </a>
                 </nav>
 
@@ -770,6 +774,64 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Admin Users Tab -->
+                    <div class="admin-panel" id="panel-adminusers">
+                        <h2>&#128100; Admin User Management</h2>
+
+                        <div class="filter-bar" style="margin-bottom:14px;">
+                            <button class="filter-btn active" id="au-tab-list" onclick="switchAuTab('list')">Admin Users</button>
+                            <button class="filter-btn" id="au-tab-audit" onclick="switchAuTab('audit')">Audit Log</button>
+                            <div style="flex:1"></div>
+                            <button class="save-btn" onclick="openAddAdminModal()">&#10010; Add New Admin</button>
+                        </div>
+
+                        <!-- Admin Users List -->
+                        <div id="au-sub-list">
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Admin Name</th>
+                                            <th>Email</th>
+                                            <th>Role</th>
+                                            <th>Permissions</th>
+                                            <th>Status</th>
+                                            <th>Last Login</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="admin-users-table"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Audit Log -->
+                        <div id="au-sub-audit" class="hidden">
+                            <div class="search-bar-row">
+                                <input type="text" id="audit-search" placeholder="&#128269; Search by admin or action..." oninput="searchAuditLogs()">
+                            </div>
+                            <div class="table-wrapper">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Timestamp</th>
+                                            <th>Admin</th>
+                                            <th>Action</th>
+                                            <th>Details</th>
+                                            <th>IP Address</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="audit-log-table"></tbody>
+                                </table>
+                            </div>
+                            <div class="pagination">
+                                <button onclick="loadAuditLogs(auditPage - 1)" id="al-prev-page">&#9664; Prev</button>
+                                <span id="al-page-info">Page 1</span>
+                                <button onclick="loadAuditLogs(auditPage + 1)" id="al-next-page">Next &#9654;</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -937,6 +999,58 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=17"></script>
+    <!-- Add/Edit Admin Modal -->
+    <div id="admin-user-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:520px;">
+            <div class="modal-header" style="background:rgba(59,130,246,0.08);">
+                <h3 id="admin-modal-title">&#10010; Add New Admin</h3>
+                <button class="modal-close" onclick="closeModal('admin-user-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="au-edit-id" value="">
+                <div class="modal-field">
+                    <label>Username *</label>
+                    <input type="text" id="au-username" placeholder="admin_username">
+                </div>
+                <div class="modal-field">
+                    <label>Email</label>
+                    <input type="email" id="au-email" placeholder="admin@example.com">
+                </div>
+                <div class="modal-field">
+                    <label id="au-password-label">Password *</label>
+                    <input type="password" id="au-password" placeholder="Min 6 characters">
+                </div>
+                <div class="modal-field">
+                    <label>Role</label>
+                    <select id="au-role" onchange="onAdminRoleChange()">
+                        <option value="moderator">Moderator</option>
+                        <option value="finance">Finance</option>
+                        <option value="super_admin">Super Admin</option>
+                    </select>
+                </div>
+                <div class="modal-field">
+                    <label>Menu Permissions</label>
+                    <div id="au-permissions" class="perm-grid">
+                        <label class="perm-check"><input type="checkbox" value="manage_users"> Manage Users</label>
+                        <label class="perm-check"><input type="checkbox" value="manage_platforms"> Manage Platforms</label>
+                        <label class="perm-check"><input type="checkbox" value="manage_rates"> Manage Rates</label>
+                        <label class="perm-check"><input type="checkbox" value="process_withdrawals"> Process Withdrawals</label>
+                        <label class="perm-check"><input type="checkbox" value="manage_fraud"> Manage Fraud</label>
+                        <label class="perm-check"><input type="checkbox" value="manage_settings"> Manage Settings</label>
+                        <label class="perm-check"><input type="checkbox" value="view_accounting"> View Accounting</label>
+                        <label class="perm-check"><input type="checkbox" value="manage_referrals"> Manage Referrals</label>
+                        <label class="perm-check"><input type="checkbox" value="view_logs"> View Logs</label>
+                        <label class="perm-check"><input type="checkbox" value="view_task_activities"> View Task Activities</label>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeModal('admin-user-modal')">Cancel</button>
+                <button class="modal-btn confirm-approve" onclick="saveAdminUser()">&#128190; Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/admin.js?v=18"></script>
 </body>
 </html>

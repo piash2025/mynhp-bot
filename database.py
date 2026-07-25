@@ -1,5 +1,7 @@
 from typing import Optional, List, Dict
 import json
+import hashlib
+import os
 
 import aiosqlite
 
@@ -240,6 +242,49 @@ async def init_db():
                 INSERT OR IGNORE INTO admin_settings (key, value)
                 VALUES (?, ?)
             """, (key, value))
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS admin_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                email TEXT DEFAULT '',
+                password_hash TEXT NOT NULL,
+                salt TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'moderator',
+                permissions TEXT DEFAULT '[]',
+                status TEXT DEFAULT 'active',
+                last_login TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username)")
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS admin_audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                admin_id INTEGER NOT NULL,
+                admin_username TEXT DEFAULT '',
+                action TEXT NOT NULL,
+                details TEXT DEFAULT '',
+                ip_address TEXT DEFAULT '',
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_audit_admin_id ON admin_audit_log(admin_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON admin_audit_log(timestamp)")
+
+        default_roles = {
+            "super_admin": ["manage_admins", "manage_users", "manage_platforms", "manage_rates",
+                            "process_withdrawals", "manage_fraud", "manage_settings", "view_accounting",
+                            "manage_referrals", "view_logs", "view_task_activities", "view_audit_log"],
+            "moderator": ["manage_users", "manage_fraud", "view_logs", "view_task_activities"],
+            "finance": ["process_withdrawals", "view_accounting", "view_logs"],
+        }
+        for role, perms in default_roles.items():
+            await db.execute("""
+                INSERT OR IGNORE INTO admin_settings (key, value)
+                VALUES (?, ?)
+            """, (f"role_{role}_permissions", json.dumps(perms)))
 
         await db.commit()
 
@@ -1175,3 +1220,110 @@ async def get_user_transaction_history(user_id: int) -> dict:
         all_txns.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
 
         return {"history": all_txns[:100]}
+
+
+# ===== ADMIN USERS / RBAC =====
+
+def hash_password(password: str, salt: str = None) -> tuple:
+    if salt is None:
+        salt = os.urandom(16).hex()
+    h = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    return h.hex(), salt
+
+
+def verify_password(password: str, password_hash: str, salt: str) -> bool:
+    h = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
+    return h.hex() == password_hash
+
+
+async def create_admin_user(username: str, email: str, password: str, role: str = "moderator", permissions: list = None) -> dict:
+    password_hash, salt = hash_password(password)
+    if permissions is None:
+        permissions = []
+    async with aiosqlite.connect(DB_PATH) as db:
+        try:
+            await db.execute("""
+                INSERT INTO admin_users (username, email, password_hash, salt, role, permissions)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (username, email, password_hash, salt, role, json.dumps(permissions)))
+            await db.commit()
+            return {"status": "ok"}
+        except aiosqlite.IntegrityError:
+            return {"error": "Username already exists"}
+
+
+async def get_admin_user_by_username(username: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM admin_users WHERE username=?", (username,)) as c:
+            row = await c.fetchone()
+            return dict(row) if row else None
+
+
+async def get_admin_user_by_id(admin_id: int) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM admin_users WHERE id=?", (admin_id,)) as c:
+            row = await c.fetchone()
+            return dict(row) if row else None
+
+
+async def get_all_admin_users() -> list:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT id, username, email, role, permissions, status, last_login, created_at FROM admin_users ORDER BY created_at DESC") as c:
+            return [dict(r) for r in await c.fetchall()]
+
+
+async def update_admin_user(admin_id: int, **kwargs) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        sets = []
+        vals = []
+        for k, v in kwargs.items():
+            if k in ("username", "email", "role", "permissions", "status", "password_hash", "salt", "last_login"):
+                if k == "permissions" and isinstance(v, list):
+                    v = json.dumps(v)
+                sets.append(f"{k}=?")
+                vals.append(v)
+        if not sets:
+            return False
+        vals.append(admin_id)
+        await db.execute(f"UPDATE admin_users SET {', '.join(sets)} WHERE id=?", vals)
+        await db.commit()
+        return True
+
+
+async def delete_admin_user(admin_id: int) -> bool:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM admin_users WHERE id=?", (admin_id,))
+        await db.commit()
+        return True
+
+
+async def log_admin_action(admin_id: int, admin_username: str, action: str, details: str = "", ip_address: str = ""):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("""
+            INSERT INTO admin_audit_log (admin_id, admin_username, action, details, ip_address)
+            VALUES (?, ?, ?, ?, ?)
+        """, (admin_id, admin_username, action, details, ip_address))
+        await db.commit()
+
+
+async def get_admin_audit_logs(page: int = 1, per_page: int = 50, search: str = "") -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        where_sql = ""
+        params = []
+        if search:
+            where_sql = " WHERE admin_username LIKE ? OR action LIKE ?"
+            params = [f"%{search}%", f"%{search}%"]
+
+        async with db.execute(f"SELECT COUNT(*) FROM admin_audit_log{where_sql}", params) as c:
+            total = (await c.fetchone())[0]
+
+        offset = (page - 1) * per_page
+        async with db.execute(f"SELECT * FROM admin_audit_log{where_sql} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+                              params + [per_page, offset]) as c:
+            rows = [dict(r) for r in await c.fetchall()]
+
+        return {"logs": rows, "total": total, "page": page, "per_page": per_page, "pages": max(1, -(-total // per_page))}

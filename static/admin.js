@@ -62,6 +62,16 @@ function logout() {
 
 // ===== DASHBOARD =====
 async function loadDashboard() {
+    try {
+        var meResp = await fetch('/api/admin/me?password=' + adminToken);
+        var meData = await meResp.json();
+        if (!meData.error) {
+            window._adminRole = meData.role;
+            if (meData.role !== 'super_admin') {
+                document.querySelectorAll('[data-min-role="super_admin"]').forEach(function(el) { el.style.display = 'none'; });
+            }
+        }
+    } catch (e) { /* ignore */ }
     await loadStats();
     await loadRates();
     await loadSettings();
@@ -155,7 +165,8 @@ var tabTitles = {
     referrals: 'Referral System',
     loginlogs: 'Login Logs & Session Audit',
     tasks: 'Task Activity Log',
-    accounting: 'Finance & Accounting'
+    accounting: 'Finance & Accounting',
+    adminusers: 'Admin User Management'
 };
 
 function switchAdminTab(tab) {
@@ -174,6 +185,7 @@ function switchAdminTab(tab) {
     if (tab === 'loginlogs') loadLoginLogs(loginLogsPage);
     if (tab === 'tasks') loadTaskActivities(taskActivitiesPage);
     if (tab === 'accounting') loadAccounting(accountingPage);
+    if (tab === 'adminusers') loadAdminUsers();
 }
 
 // ===== AD RATES =====
@@ -1394,6 +1406,185 @@ async function exportUserAccountingCSV() {
         URL.revokeObjectURL(url);
         showToast('CSV exported successfully!', 'success');
     } catch (e) { showToast('Export failed', 'error'); }
+}
+
+// ===== ADMIN USER MANAGEMENT =====
+var currentAuTab = 'list';
+var auditPage = 1;
+var _auditSearchTimer = null;
+
+function switchAuTab(tab) {
+    currentAuTab = tab;
+    document.getElementById('au-tab-list').classList.toggle('active', tab === 'list');
+    document.getElementById('au-tab-audit').classList.toggle('active', tab === 'audit');
+    document.getElementById('au-sub-list').classList.toggle('hidden', tab !== 'list');
+    document.getElementById('au-sub-audit').classList.toggle('hidden', tab !== 'audit');
+    if (tab === 'audit') loadAuditLogs(1);
+}
+
+async function loadAdminUsers() {
+    try {
+        var resp = await fetch('/api/admin/admin-users?password=' + adminToken);
+        var data = await resp.json();
+        if (data.error) return;
+        var tbody = document.getElementById('admin-users-table');
+        if (!data.admin_users || data.admin_users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px;">No admin users found</td></tr>';
+            return;
+        }
+        tbody.innerHTML = data.admin_users.map(function(u) {
+            var statusClass = u.status === 'active' ? 'status-accepted' : 'status-rejected';
+            var perms = [];
+            try { perms = JSON.parse(u.permissions); } catch(e) {}
+            var permBadges = u.role === 'super_admin' ? '<span class="status-badge status-accepted">ALL</span>' :
+                perms.map(function(p) { return '<span class="status-badge status-pending" style="font-size:10px;margin:1px;">' + p.replace('manage_', '').replace('view_', '').replace('process_', '') + '</span>'; }).join(' ');
+            return '<tr>' +
+                '<td><strong>' + u.username + '</strong></td>' +
+                '<td>' + (u.email || '-') + '</td>' +
+                '<td><span class="status-badge ' + (u.role === 'super_admin' ? 'status-accepted' : 'status-pending') + '">' + u.role + '</span></td>' +
+                '<td style="max-width:260px;">' + permBadges + '</td>' +
+                '<td><span class="status-badge ' + statusClass + '">' + u.status + '</span></td>' +
+                '<td style="font-size:12px;color:var(--text2);">' + (u.last_login ? formatDate(u.last_login) : 'Never') + '</td>' +
+                '<td>' +
+                    '<button class="btn-edit" onclick="editAdminUser(' + u.id + ')">&#9998;</button> ' +
+                    (u.role !== 'super_admin' ? '<button class="btn-delete" onclick="deleteAdminUser(' + u.id + ', \'' + u.username + '\')">&#128465;</button>' : '') +
+                '</td></tr>';
+        }).join('');
+    } catch (e) { /* ignore */ }
+}
+
+function openAddAdminModal() {
+    document.getElementById('admin-modal-title').textContent = '\u2710 Add New Admin';
+    document.getElementById('au-edit-id').value = '';
+    document.getElementById('au-username').value = '';
+    document.getElementById('au-username').disabled = false;
+    document.getElementById('au-email').value = '';
+    document.getElementById('au-password').value = '';
+    document.getElementById('au-password-label').textContent = 'Password *';
+    document.getElementById('au-role').value = 'moderator';
+    document.querySelectorAll('#au-permissions input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+    openModal('admin-user-modal');
+}
+
+async function editAdminUser(id) {
+    try {
+        var resp = await fetch('/api/admin/admin-users?password=' + adminToken);
+        var data = await resp.json();
+        var user = (data.admin_users || []).find(function(u) { return u.id === id; });
+        if (!user) return;
+        document.getElementById('admin-modal-title').textContent = '\u2702 Edit Admin: ' + user.username;
+        document.getElementById('au-edit-id').value = user.id;
+        document.getElementById('au-username').value = user.username;
+        document.getElementById('au-username').disabled = true;
+        document.getElementById('au-email').value = user.email || '';
+        document.getElementById('au-password').value = '';
+        document.getElementById('au-password-label').textContent = 'New Password (leave blank to keep)';
+        document.getElementById('au-role').value = user.role;
+        var perms = [];
+        try { perms = JSON.parse(user.permissions); } catch(e) {}
+        document.querySelectorAll('#au-permissions input[type="checkbox"]').forEach(function(cb) {
+            cb.checked = perms.indexOf(cb.value) !== -1 || user.role === 'super_admin';
+        });
+        openModal('admin-user-modal');
+    } catch (e) { /* ignore */ }
+}
+
+function onAdminRoleChange() {
+    var role = document.getElementById('au-role').value;
+    if (role === 'super_admin') {
+        document.querySelectorAll('#au-permissions input[type="checkbox"]').forEach(function(cb) { cb.checked = true; cb.disabled = true; });
+    } else {
+        document.querySelectorAll('#au-permissions input[type="checkbox"]').forEach(function(cb) { cb.disabled = false; });
+        if (role === 'moderator') {
+            ['manage_users', 'manage_fraud', 'view_logs', 'view_task_activities'].forEach(function(p) {
+                var cb = document.querySelector('#au-permissions input[value="' + p + '"]');
+                if (cb) cb.checked = true;
+            });
+        } else if (role === 'finance') {
+            ['process_withdrawals', 'view_accounting', 'view_logs'].forEach(function(p) {
+                var cb = document.querySelector('#au-permissions input[value="' + p + '"]');
+                if (cb) cb.checked = true;
+            });
+        }
+    }
+}
+
+async function saveAdminUser() {
+    var id = document.getElementById('au-edit-id').value;
+    var username = document.getElementById('au-username').value.trim();
+    var email = document.getElementById('au-email').value.trim();
+    var password = document.getElementById('au-password').value;
+    var role = document.getElementById('au-role').value;
+    var permissions = [];
+    document.querySelectorAll('#au-permissions input[type="checkbox"]:checked').forEach(function(cb) { permissions.push(cb.value); });
+
+    if (!username) { showToast('Username required', 'error'); return; }
+    if (!id && !password) { showToast('Password required', 'error'); return; }
+    if (password && password.length < 6) { showToast('Password min 6 characters', 'error'); return; }
+
+    var body = { username: username, email: email, role: role, permissions: permissions };
+    if (password) body.password = password;
+
+    try {
+        var url, resp;
+        if (id) {
+            resp = await fetch('/api/admin/admin-users/' + id + '/update?password=' + adminToken, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+        } else {
+            resp = await fetch('/api/admin/admin-users?password=' + adminToken, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+            });
+        }
+        var result = await resp.json();
+        if (result.error) { showToast(result.error, 'error'); return; }
+        showToast(id ? 'Admin updated!' : 'Admin created!', 'success');
+        closeModal('admin-user-modal');
+        loadAdminUsers();
+    } catch (e) { showToast('Failed to save', 'error'); }
+}
+
+async function deleteAdminUser(id, username) {
+    if (!confirm('Delete admin "' + username + '"? This cannot be undone.')) return;
+    try {
+        var resp = await fetch('/api/admin/admin-users/' + id + '/delete?password=' + adminToken, { method: 'POST' });
+        var result = await resp.json();
+        if (result.error) { showToast(result.error, 'error'); return; }
+        showToast('Admin deleted', 'success');
+        loadAdminUsers();
+    } catch (e) { showToast('Failed to delete', 'error'); }
+}
+
+async function loadAuditLogs(page) {
+    auditPage = page || 1;
+    var search = document.getElementById('audit-search') ? document.getElementById('audit-search').value.trim() : '';
+    try {
+        var resp = await fetch('/api/admin/audit-logs?password=' + adminToken + '&page=' + auditPage + '&search=' + encodeURIComponent(search));
+        var data = await resp.json();
+        if (data.error) return;
+        var tbody = document.getElementById('audit-log-table');
+        if (!data.logs || data.logs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text2);padding:20px;">No audit logs found</td></tr>';
+        } else {
+            tbody.innerHTML = data.logs.map(function(l) {
+                return '<tr>' +
+                    '<td style="font-size:12px;">' + formatDate(l.timestamp) + '</td>' +
+                    '<td><strong>' + l.admin_username + '</strong></td>' +
+                    '<td>' + l.action + '</td>' +
+                    '<td style="font-size:12px;color:var(--text2);max-width:200px;overflow:hidden;text-overflow:ellipsis;">' + (l.details || '-') + '</td>' +
+                    '<td style="font-size:12px;">' + (l.ip_address || '-') + '</td>' +
+                    '</tr>';
+            }).join('');
+        }
+        document.getElementById('al-page-info').textContent = 'Page ' + auditPage + ' of ' + data.pages;
+        document.getElementById('al-prev-page').disabled = auditPage <= 1;
+        document.getElementById('al-next-page').disabled = auditPage >= data.pages;
+    } catch (e) { /* ignore */ }
+}
+
+function searchAuditLogs() {
+    clearTimeout(_auditSearchTimer);
+    _auditSearchTimer = setTimeout(function() { loadAuditLogs(1); }, 300);
 }
 
 // ===== AUTH CHECK ON LOAD =====

@@ -646,6 +646,11 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 .ll-stat.vpn .ll-stat-num { color: var(--blue); }
 .ll-stat-label { font-size: 11px; color: var(--text2); text-transform: uppercase; }
 
+/* ===== PERMISSION GRID ===== */
+.perm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-top: 6px; }
+.perm-check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text); cursor: pointer; padding: 4px 0; }
+.perm-check input[type="checkbox"] { accent-color: var(--accent); }
+
 /* ===== DASHBOARD ===== */
 .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 .chart-box { background: var(--bg2); border-radius: 12px; padding: 18px; border: 1px solid var(--border); }
