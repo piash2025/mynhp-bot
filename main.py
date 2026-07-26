@@ -480,6 +480,19 @@ async def check_ad_available(user_id: int, network: str):
     return {"available": True}
 
 
+@app.get("/api/user/ad-script/{network}")
+async def get_ad_script(network: str):
+    """Return script_code + placement_id for a network so frontend can inject SDK."""
+    platform = await get_platform_by_slug(network)
+    if not platform:
+        return {"error": "Platform not found"}
+    return {
+        "script_code": platform.get("script_code", ""),
+        "placement_id": platform.get("placement_id", ""),
+        "api_key": platform.get("api_key", ""),
+    }
+
+
 @app.post("/api/user/heartbeat")
 async def user_heartbeat(request: Request):
     data = await request.json()

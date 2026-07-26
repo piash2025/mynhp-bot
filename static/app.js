@@ -431,8 +431,36 @@ function switchTab(tabName) {
 
 // ===== AD WATCHING =====
 let currentAdNetwork = null;
-let adTimerInterval = null;
 let adLoading = {};
+let loadedScripts = {};
+
+function loadAdScript(scriptCode) {
+    return new Promise(function(resolve, reject) {
+        if (scriptCode && !document.querySelector('script[data-ad-injected="true"]')) {
+            var div = document.createElement('div');
+            div.innerHTML = scriptCode;
+            var script = div.querySelector('script');
+            if (script) {
+                var newScript = document.createElement('script');
+                newScript.src = script.src;
+                newScript.dataset.adInjected = 'true';
+                if (script.dataset.zone) newScript.dataset.zone = script.dataset.zone;
+                if (script.dataset.sdk) newScript.dataset.sdk = script.dataset.sdk;
+                newScript.onload = resolve;
+                newScript.onerror = reject;
+                document.head.appendChild(newScript);
+                return;
+            }
+        }
+        resolve();
+    });
+}
+
+function showAdSDK(zoneId) {
+    var showFn = window['show_' + zoneId];
+    if (!showFn) return Promise.reject(new Error('SDK not loaded'));
+    return showFn({ type: 'end', ymid: String(currentUser?.id || ''), requestVar: currentAdNetwork });
+}
 
 async function watchAd(network) {
     if (document.getElementById('banned-overlay') && !document.getElementById('banned-overlay').classList.contains('hidden')) {
@@ -472,76 +500,83 @@ async function watchAd(network) {
             const resp = await fetch('/api/user/ad-cooldown/' + currentUser.id);
             const cd = await resp.json();
             if (cd.remaining > 0) {
-                startCooldownTimer(cd.remaining);
+                startCooldownTimer(network, cd.remaining);
                 return;
             }
         } catch (e) { /* ignore */ }
     }
+
     currentAdNetwork = network;
     adLoading[network] = true;
-    const modal = document.getElementById('ad-modal');
-    const title = document.getElementById('ad-modal-title');
-    const timer = document.getElementById('ad-timer');
-    const footer = document.getElementById('ad-modal-footer');
-    const body = document.getElementById('ad-modal-body');
 
-    const networkNames = {
-        'adsgream': 'AdsGram',
-        'monetag': 'Monetag',
-        'adexium': 'Adexium',
-        'bonus': 'Bonus Offer',
-    };
+    var networkNames = { 'adsgream': 'AdsGram', 'monetag': 'Monetag', 'adexium': 'Adexium', 'bonus': 'Bonus Offer' };
+    var modal = document.getElementById('ad-modal');
+    var title = document.getElementById('ad-modal-title');
+    var footer = document.getElementById('ad-modal-footer');
+    var body = document.getElementById('ad-modal-body');
+    var timer = document.getElementById('ad-timer');
 
-    title.textContent = 'Watching ' + (networkNames[network] || network) + ' Ad...';
-    timer.textContent = '5s';
+    title.textContent = networkNames[network] || network;
+    timer.textContent = '';
     footer.classList.add('hidden');
-    body.innerHTML = `
-        <div class="ad-placeholder">
-            <span>&#128250;</span>
-            <p>Ad is loading...</p>
-            <div class="ad-loading-bar">
-                <div class="ad-loading-fill"></div>
-            </div>
-        </div>
-    `;
+    body.innerHTML = '<div class="ad-placeholder"><span>&#128250;</span><p>Loading ad...</p><div class="ad-loading-bar"><div class="ad-loading-fill"></div></div></div>';
     modal.classList.remove('hidden');
 
-    let seconds = 5;
-    adTimerInterval = setInterval(() => {
-        seconds--;
-        timer.textContent = seconds + 's';
-        if (seconds <= 0) {
-            clearInterval(adTimerInterval);
-            timer.textContent = 'Done!';
-            footer.classList.remove('hidden');
-            body.innerHTML = `
-                <div class="ad-placeholder">
-                    <span>&#9989;</span>
-                    <p>Ad completed! Ready to claim reward.</p>
-                </div>
-            `;
-        }
-    }, 1000);
-
+    // Log tool use
     fetch('/api/tool/use', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: currentUser?.id, network: network }),
-    }).then(function(resp) {
-        return resp.json();
-    }).then(function(data) {
-        if (data.banned) {
-            showBannedScreen();
-            document.getElementById('ad-modal').classList.add('hidden');
-            clearInterval(adTimerInterval);
-            adLoading[currentAdNetwork] = false;
-        } else if (data.vpn_warning) {
-            showVPNWarning(data.message);
-            document.getElementById('ad-modal').classList.add('hidden');
-            clearInterval(adTimerInterval);
-            adLoading[currentAdNetwork] = false;
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.banned) { showBannedScreen(); modal.classList.add('hidden'); adLoading[network] = false; }
+        else if (data.vpn_warning) { showVPNWarning(data.message); modal.classList.add('hidden'); adLoading[network] = false; }
+    }).catch(function() {});
+
+    // Fetch script_code from backend
+    try {
+        var scriptResp = await fetch('/api/user/ad-script/' + network);
+        var scriptData = await scriptResp.json();
+        if (!scriptData.script_code) {
+            modal.classList.add('hidden');
+            adLoading[network] = false;
+            showNoAdsModal(network);
+            return;
         }
-    }).catch(function() { adLoading[currentAdNetwork] = false; });
+
+        // Load SDK script into page
+        await loadAdScript(scriptData.script_code);
+
+        // Find zone ID from script
+        var match = scriptData.script_code.match(/data-zone=['"](\d+)['"]/);
+        var showFnMatch = scriptData.script_code.match(/data-sdk=['"]show_(\d+)['"]/);
+        var zoneId = match ? match[1] : (showFnMatch ? showFnMatch[1] : null);
+
+        if (!zoneId || typeof window['show_' + zoneId] !== 'function') {
+            modal.classList.add('hidden');
+            adLoading[network] = false;
+            showNoAdsModal(network);
+            return;
+        }
+
+        // Show loading in modal
+        body.innerHTML = '<div class="ad-placeholder"><span>&#128250;</span><p>Ad is ready. Playing now...</p></div>';
+
+        // Call real Monetag SDK
+        showAdSDK(zoneId).then(function(result) {
+            modal.classList.add('hidden');
+            adLoading[network] = false;
+            claimReward();
+        }).catch(function(err) {
+            modal.classList.add('hidden');
+            adLoading[network] = false;
+            showNoAdsModal(network);
+        });
+
+    } catch (e) {
+        modal.classList.add('hidden');
+        adLoading[network] = false;
+        showNoAdsModal(network);
+    }
 }
 
 function claimReward() {
@@ -555,7 +590,6 @@ function claimReward() {
     updateUI();
 
     document.getElementById('ad-modal').classList.add('hidden');
-    clearInterval(adTimerInterval);
     adLoading[currentAdNetwork] = false;
 
     if (tg?.HapticFeedback) {
@@ -720,7 +754,7 @@ function withdraw() {
 
 // ===== MODAL CLOSE ON BACKDROP =====
 document.getElementById('ad-modal')?.addEventListener('click', function (e) {
-    if (e.target === this && !adTimerInterval) {
+    if (e.target === this && !adLoading[currentAdNetwork]) {
         this.classList.add('hidden');
     }
 });
