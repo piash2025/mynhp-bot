@@ -263,6 +263,8 @@ async def init_db():
                 permissions TEXT DEFAULT '[]',
                 status TEXT DEFAULT 'active',
                 country_restriction TEXT DEFAULT 'BD',
+                two_factor_secret TEXT DEFAULT '',
+                two_factor_enabled INTEGER DEFAULT 0,
                 last_login TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )

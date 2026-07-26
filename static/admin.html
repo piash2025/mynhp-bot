@@ -32,6 +32,22 @@
             </div>
         </div>
 
+        <!-- 2FA Login Screen -->
+        <div id="twofa-login-screen" class="login-screen hidden">
+            <div class="login-card">
+                <div class="login-icon">&#128273;</div>
+                <h1>Two-Factor Auth</h1>
+                <p>Enter the 6-digit code from your authenticator app</p>
+                <form id="twofa-login-form">
+                    <input type="text" id="twofa-login-code" placeholder="6-digit code" maxlength="6" pattern="[0-9]{6}" required autocomplete="off">
+                    <input type="hidden" id="twofa-pending-pw">
+                    <button type="submit">Verify</button>
+                </form>
+                <p id="twofa-login-error" class="error hidden">Invalid code!</p>
+                <button class="back-btn" onclick="twofaLoginBack()" style="margin-top:10px;background:none;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.7);padding:8px 16px;border-radius:8px;cursor:pointer;width:100%;">&#8592; Back</button>
+            </div>
+        </div>
+
         <!-- Admin Dashboard -->
         <div id="admin-dashboard" class="admin-layout hidden">
             <!-- Sidebar Overlay (mobile) -->
@@ -114,6 +130,7 @@
                         <span class="header-title" id="header-title">Analytics Dashboard</span>
                     </div>
                     <div class="header-actions">
+                        <button class="quick-add-btn" id="twofa-btn" onclick="open2FASetup()">&#128273; Enable 2FA</button>
                         <button class="quick-add-btn" onclick="openChangePasswordModal()">&#128274; Change Password</button>
                         <button class="quick-add-btn" onclick="openPlatformModal()">&#10010; Add Platform</button>
                     </div>
@@ -1092,6 +1109,55 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=22"></script>
+    <!-- 2FA Setup Modal -->
+    <div id="twofa-setup-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header" style="background:rgba(16,185,129,0.08);">
+                <h3>&#128273; Setup Two-Factor Auth</h3>
+                <button class="modal-close" onclick="closeModal('twofa-setup-modal')">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align:center;">
+                <p style="color:rgba(255,255,255,0.7);margin-bottom:12px;">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.)</p>
+                <div style="background:white;border-radius:12px;padding:16px;display:inline-block;margin-bottom:16px;">
+                    <img id="twofa-qr-img" src="" alt="QR Code" style="width:200px;height:200px;">
+                </div>
+                <div class="modal-field" style="text-align:left;">
+                    <label>Secret Key (manual entry)</label>
+                    <input type="text" id="twofa-secret-display" readonly style="font-family:monospace;font-size:13px;background:rgba(255,255,255,0.05);">
+                </div>
+                <div class="modal-field" style="text-align:left;">
+                    <label>Enter 6-digit code to verify</label>
+                    <input type="text" id="twofa-verify-code" placeholder="000000" maxlength="6" pattern="[0-9]{6}" autocomplete="off">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeModal('twofa-setup-modal')">Cancel</button>
+                <button class="modal-btn confirm-approve" onclick="verify2FAEnable()">&#10004; Enable</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2FA Disable Modal -->
+    <div id="twofa-disable-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:380px;">
+            <div class="modal-header" style="background:rgba(239,68,68,0.08);">
+                <h3>&#128274; Disable Two-Factor Auth</h3>
+                <button class="modal-close" onclick="closeModal('twofa-disable-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="color:rgba(255,255,255,0.7);margin-bottom:12px;">Enter your password to confirm</p>
+                <div class="modal-field">
+                    <label>Password</label>
+                    <input type="password" id="twofa-disable-pw" placeholder="Your password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeModal('twofa-disable-modal')">Cancel</button>
+                <button class="modal-btn confirm-reject" onclick="disable2FA()">&#10006; Disable</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/admin.js?v=23"></script>
 </body>
 </html>

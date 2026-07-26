@@ -542,7 +542,109 @@ async def admin_login(request: Request):
     stored = await get_admin_setting("admin_password")
     if stored and stored == password:
         return {"status": "ok"}
+    admin = await get_admin_user_by_username(password)
+    if admin and verify_password(password, admin["password_hash"], admin["salt"]):
+        if admin["status"] != "active":
+            return {"status": "error", "message": "Account disabled"}
+        if admin["two_factor_enabled"]:
+            return {"status": "2fa_required", "admin_username": admin["username"]}
+        return {"status": "ok"}
     return {"status": "error", "message": "Wrong password"}
+
+
+@app.post("/api/admin/2fa/verify-login")
+async def admin_2fa_verify_login(request: Request):
+    data = await request.json()
+    password = data.get("password", "")
+    code = data.get("code", "")
+    if not password or not code:
+        return {"status": "error", "message": "Password and code required"}
+    admin = await get_admin_user_by_username(password)
+    if not admin or not verify_password(password, admin["password_hash"], admin["salt"]):
+        return {"status": "error", "message": "Invalid credentials"}
+    if not admin["two_factor_enabled"] or not admin["two_factor_secret"]:
+        return {"status": "error", "message": "2FA not enabled"}
+    if not verify_totp_code(admin["two_factor_secret"], code):
+        return {"status": "error", "message": "Invalid code"}
+    return {"status": "ok"}
+
+
+@app.get("/api/admin/2fa/status")
+async def admin_2fa_status(request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
+    if admin["admin_id"] == 0:
+        return {"enabled": False, "message": "Legacy admin does not support 2FA"}
+    admin_user = await get_admin_user_by_id(admin["admin_id"])
+    if not admin_user:
+        return {"error": "Admin not found"}
+    return {"enabled": bool(admin_user["two_factor_enabled"])}
+
+
+@app.post("/api/admin/2fa/setup")
+async def admin_2fa_setup(request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
+    if admin["admin_id"] == 0:
+        return {"error": "Legacy admin cannot setup 2FA"}
+    admin_user = await get_admin_user_by_id(admin["admin_id"])
+    if not admin_user:
+        return {"error": "Admin not found"}
+    if admin_user["two_factor_enabled"]:
+        return {"error": "2FA already enabled. Disable first."}
+    secret = generate_totp_secret()
+    await update_admin_user(admin["admin_id"], two_factor_secret=secret)
+    issuer = "AdBot"
+    label = admin["username"]
+    qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=otpauth://totp/{issuer}:{label}?secret={secret}&issuer={issuer}&digits=6&period=30"
+    return {"secret": secret, "qr_url": qr_url}
+
+
+@app.post("/api/admin/2fa/verify")
+async def admin_2fa_verify(request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
+    if admin["admin_id"] == 0:
+        return {"error": "Legacy admin cannot use 2FA"}
+    data = await request.json()
+    code = data.get("code", "")
+    if not code:
+        return {"error": "Code required"}
+    admin_user = await get_admin_user_by_id(admin["admin_id"])
+    if not admin_user:
+        return {"error": "Admin not found"}
+    secret = admin_user["two_factor_secret"]
+    if not secret:
+        return {"error": "Run setup first"}
+    if not verify_totp_code(secret, code):
+        return {"error": "Invalid code"}
+    await update_admin_user(admin["admin_id"], two_factor_enabled=1)
+    await log_admin_action(admin["admin_id"], admin["username"], "Enabled 2FA", "", "")
+    return {"status": "ok"}
+
+
+@app.post("/api/admin/2fa/disable")
+async def admin_2fa_disable(request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
+    if admin["admin_id"] == 0:
+        return {"error": "Legacy admin cannot use 2FA"}
+    data = await request.json()
+    password = data.get("password", "")
+    if not password:
+        return {"error": "Password required to disable 2FA"}
+    admin_user = await get_admin_user_by_id(admin["admin_id"])
+    if not admin_user:
+        return {"error": "Admin not found"}
+    if not verify_password(password, admin_user["password_hash"], admin_user["salt"]):
+        return {"error": "Wrong password"}
+    await update_admin_user(admin["admin_id"], two_factor_enabled=0, two_factor_secret="")
+    await log_admin_action(admin["admin_id"], admin["username"], "Disabled 2FA", "", "")
+    return {"status": "ok"}
 
 
 @app.get("/api/admin/me")

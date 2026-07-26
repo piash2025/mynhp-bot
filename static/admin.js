@@ -41,6 +41,11 @@ document.getElementById('login-form').addEventListener('submit', async function(
             document.getElementById('admin-dashboard').classList.remove('hidden');
             loadDashboard();
             showToast('Login successful!', 'success');
+        } else if (data.status === '2fa_required') {
+            document.getElementById('twofa-pending-pw').value = password;
+            document.getElementById('login-screen').classList.add('hidden');
+            document.getElementById('twofa-login-screen').classList.remove('hidden');
+            showToast('Enter 2FA code', 'info');
         } else {
             document.getElementById('login-error').classList.remove('hidden');
             showToast('Wrong password!', 'error');
@@ -50,6 +55,44 @@ document.getElementById('login-form').addEventListener('submit', async function(
         showToast('Connection error!', 'error');
     }
 });
+
+// ===== 2FA LOGIN =====
+document.getElementById('twofa-login-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var code = document.getElementById('twofa-login-code').value;
+    var password = document.getElementById('twofa-pending-pw').value;
+    var errEl = document.getElementById('twofa-login-error');
+    errEl.classList.add('hidden');
+    try {
+        var resp = await fetch('/api/admin/2fa/verify-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: password, code: code }),
+        });
+        var data = await resp.json();
+        if (data.status === 'ok') {
+            adminToken = password;
+            sessionStorage.setItem('adminToken', password);
+            document.getElementById('twofa-login-screen').classList.add('hidden');
+            document.getElementById('admin-dashboard').classList.remove('hidden');
+            loadDashboard();
+            showToast('Login successful!', 'success');
+        } else {
+            errEl.classList.remove('hidden');
+            showToast(data.message || 'Invalid code', 'error');
+        }
+    } catch (err) {
+        errEl.classList.remove('hidden');
+        showToast('Connection error', 'error');
+    }
+});
+
+function twofaLoginBack() {
+    document.getElementById('twofa-login-screen').classList.add('hidden');
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('twofa-login-code').value = '';
+    document.getElementById('twofa-pending-pw').value = '';
+}
 
 function logout() {
     adminToken = null;
@@ -88,6 +131,7 @@ async function loadDashboard() {
     loadLoginLogs(1);
     loadLiveCount();
     loadTaskActivities(1);
+    load2FAStatus();
     setInterval(loadLiveCount, 15000);
 }
 
@@ -1617,6 +1661,74 @@ async function changeAdminPassword() {
         sessionStorage.setItem('adminToken', adminToken);
         showToast('Password changed!', 'success');
         closeModal('change-pw-modal');
+    } catch (e) { showToast('Failed', 'error'); }
+}
+
+// ===== ADMIN 2FA =====
+async function load2FAStatus() {
+    try {
+        var resp = await fetch('/api/admin/2fa/status?password=' + adminToken);
+        var data = await resp.json();
+        var btn = document.getElementById('twofa-btn');
+        if (data.enabled) {
+            btn.innerHTML = '&#128274; Disable 2FA';
+            btn.onclick = function() { open2FADisableModal(); };
+        } else {
+            btn.innerHTML = '&#128273; Enable 2FA';
+            btn.onclick = function() { open2FASetup(); };
+        }
+    } catch (e) {}
+}
+
+async function open2FASetup() {
+    try {
+        var resp = await fetch('/api/admin/2fa/setup', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+        });
+        var data = await resp.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        document.getElementById('twofa-qr-img').src = data.qr_url;
+        document.getElementById('twofa-secret-display').value = data.secret;
+        document.getElementById('twofa-verify-code').value = '';
+        openModal('twofa-setup-modal');
+    } catch (e) { showToast('Failed', 'error'); }
+}
+
+async function verify2FAEnable() {
+    var code = document.getElementById('twofa-verify-code').value;
+    if (!code || code.length !== 6) { showToast('Enter 6-digit code', 'error'); return; }
+    try {
+        var resp = await fetch('/api/admin/2fa/verify?password=' + adminToken, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code }),
+        });
+        var data = await resp.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('2FA enabled!', 'success');
+        closeModal('twofa-setup-modal');
+        load2FAStatus();
+    } catch (e) { showToast('Failed', 'error'); }
+}
+
+function open2FADisableModal() {
+    document.getElementById('twofa-disable-pw').value = '';
+    openModal('twofa-disable-modal');
+}
+
+async function disable2FA() {
+    var pw = document.getElementById('twofa-disable-pw').value;
+    if (!pw) { showToast('Enter your password', 'error'); return; }
+    try {
+        var resp = await fetch('/api/admin/2fa/disable?password=' + adminToken, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: pw }),
+        });
+        var data = await resp.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        showToast('2FA disabled', 'success');
+        closeModal('twofa-disable-modal');
+        load2FAStatus();
     } catch (e) { showToast('Failed', 'error'); }
 }
 
