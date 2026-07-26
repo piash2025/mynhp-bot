@@ -339,6 +339,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border);
     z-index: 500;
+    overflow: visible;
 }
 
 .header-title {
@@ -400,15 +401,15 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
 }
 
 .profile-dropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
+    position: fixed;
+    top: calc(var(--header-h) + 6px);
+    right: 16px;
     width: 240px;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.4);
-    z-index: 1000;
+    z-index: 9999;
     overflow: hidden;
     animation: dropIn 0.15s ease;
 }
