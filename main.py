@@ -141,26 +141,27 @@ async def authenticate_admin(password: str, request: Request = None) -> dict:
                             "manage_referrals", "view_logs", "view_task_activities", "view_audit_log"],
             "country_restriction": "",
         }
-    admin = await get_admin_user_by_username(password)
-    if admin and verify_password(password, admin["password_hash"], admin["salt"]):
-        if admin["status"] != "active":
-            return None
-        country_allowed = admin.get("country_restriction", "BD") or ""
-        if country_allowed and request:
-            ip = extract_ip(request)
-            if ip:
-                geo = await get_geo_info(ip)
-                user_country = geo.get("country", "")
-                if user_country and user_country != country_allowed:
-                    return None
-        await update_admin_user(admin["id"], last_login=time.strftime("%Y-%m-%d %H:%M:%S"))
-        return {
-            "admin_id": admin["id"],
-            "username": admin["username"],
-            "role": admin["role"],
-            "permissions": json.loads(admin["permissions"]) if admin["permissions"] else [],
-            "country_restriction": country_allowed,
-        }
+    all_admins = await get_all_admin_users()
+    for admin in all_admins:
+        if verify_password(password, admin["password_hash"], admin["salt"]):
+            if admin["status"] != "active":
+                continue
+            country_allowed = admin.get("country_restriction", "BD") or ""
+            if country_allowed and request:
+                ip = extract_ip(request)
+                if ip:
+                    geo = await get_geo_info(ip)
+                    user_country = geo.get("country", "")
+                    if user_country and user_country != country_allowed:
+                        continue
+            await update_admin_user(admin["id"], last_login=time.strftime("%Y-%m-%d %H:%M:%S"))
+            return {
+                "admin_id": admin["id"],
+                "username": admin["username"],
+                "role": admin["role"],
+                "permissions": json.loads(admin["permissions"]) if admin["permissions"] else [],
+                "country_restriction": country_allowed,
+            }
     return None
 
 
@@ -542,13 +543,14 @@ async def admin_login(request: Request):
     stored = await get_admin_setting("admin_password")
     if stored and stored == password:
         return {"status": "ok"}
-    admin = await get_admin_user_by_username(password)
-    if admin and verify_password(password, admin["password_hash"], admin["salt"]):
-        if admin["status"] != "active":
-            return {"status": "error", "message": "Account disabled"}
-        if admin["two_factor_enabled"]:
-            return {"status": "2fa_required", "admin_username": admin["username"]}
-        return {"status": "ok"}
+    all_admins = await get_all_admin_users()
+    for admin in all_admins:
+        if verify_password(password, admin["password_hash"], admin["salt"]):
+            if admin["status"] != "active":
+                return {"status": "error", "message": "Account disabled"}
+            if admin["two_factor_enabled"]:
+                return {"status": "2fa_required", "admin_username": admin["username"]}
+            return {"status": "ok"}
     return {"status": "error", "message": "Wrong password"}
 
 
@@ -559,14 +561,15 @@ async def admin_2fa_verify_login(request: Request):
     code = data.get("code", "")
     if not password or not code:
         return {"status": "error", "message": "Password and code required"}
-    admin = await get_admin_user_by_username(password)
-    if not admin or not verify_password(password, admin["password_hash"], admin["salt"]):
-        return {"status": "error", "message": "Invalid credentials"}
-    if not admin["two_factor_enabled"] or not admin["two_factor_secret"]:
-        return {"status": "error", "message": "2FA not enabled"}
-    if not verify_totp_code(admin["two_factor_secret"], code):
-        return {"status": "error", "message": "Invalid code"}
-    return {"status": "ok"}
+    all_admins = await get_all_admin_users()
+    for admin in all_admins:
+        if verify_password(password, admin["password_hash"], admin["salt"]):
+            if not admin["two_factor_enabled"] or not admin["two_factor_secret"]:
+                return {"status": "error", "message": "2FA not enabled"}
+            if not verify_totp_code(admin["two_factor_secret"], code):
+                return {"status": "error", "message": "Invalid code"}
+            return {"status": "ok"}
+    return {"status": "error", "message": "Invalid credentials"}
 
 
 @app.get("/api/admin/2fa/status")
