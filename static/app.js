@@ -253,6 +253,7 @@ function showNoAdsModal(network) {
     modal.classList.remove('hidden');
     setTimeout(function() {
         modal.classList.add('hidden');
+        adLoading[network] = false;
     }, 3000);
 }
 
@@ -431,9 +432,14 @@ function switchTab(tabName) {
 // ===== AD WATCHING =====
 let currentAdNetwork = null;
 let adTimerInterval = null;
+let adLoading = {};
 
 async function watchAd(network) {
     if (document.getElementById('banned-overlay') && !document.getElementById('banned-overlay').classList.contains('hidden')) {
+        return;
+    }
+    if (adLoading[network]) {
+        showToast('Ad is loading, please wait...');
         return;
     }
     var cdKey = 'cd_' + network;
@@ -472,6 +478,7 @@ async function watchAd(network) {
         } catch (e) { /* ignore */ }
     }
     currentAdNetwork = network;
+    adLoading[network] = true;
     const modal = document.getElementById('ad-modal');
     const title = document.getElementById('ad-modal-title');
     const timer = document.getElementById('ad-timer');
@@ -527,12 +534,14 @@ async function watchAd(network) {
             showBannedScreen();
             document.getElementById('ad-modal').classList.add('hidden');
             clearInterval(adTimerInterval);
+            adLoading[currentAdNetwork] = false;
         } else if (data.vpn_warning) {
             showVPNWarning(data.message);
             document.getElementById('ad-modal').classList.add('hidden');
             clearInterval(adTimerInterval);
+            adLoading[currentAdNetwork] = false;
         }
-    }).catch(function() {});
+    }).catch(function() { adLoading[currentAdNetwork] = false; });
 }
 
 function claimReward() {
@@ -547,6 +556,7 @@ function claimReward() {
 
     document.getElementById('ad-modal').classList.add('hidden');
     clearInterval(adTimerInterval);
+    adLoading[currentAdNetwork] = false;
 
     if (tg?.HapticFeedback) {
         tg.HapticFeedback.notificationOccurred('success');
