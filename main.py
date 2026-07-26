@@ -542,6 +542,9 @@ async def admin_login(request: Request):
     password = data.get("password", "")
     stored = await get_admin_setting("admin_password")
     if stored and stored == password:
+        twofa = await get_admin_setting("admin_2fa_enabled")
+        if twofa == "1":
+            return {"status": "2fa_required", "admin_username": "super_admin"}
         return {"status": "ok"}
     all_admins = await get_all_admin_users()
     for admin in all_admins:
@@ -561,6 +564,14 @@ async def admin_2fa_verify_login(request: Request):
     code = data.get("code", "")
     if not password or not code:
         return {"status": "error", "message": "Password and code required"}
+    stored = await get_admin_setting("admin_password")
+    if stored and stored == password:
+        secret = await get_admin_setting("admin_2fa_secret")
+        if not secret:
+            return {"status": "error", "message": "2FA not configured"}
+        if not verify_totp_code(secret, code):
+            return {"status": "error", "message": "Invalid code"}
+        return {"status": "ok"}
     all_admins = await get_all_admin_users()
     for admin in all_admins:
         if verify_password(password, admin["password_hash"], admin["salt"]):
@@ -578,7 +589,8 @@ async def admin_2fa_status(request: Request):
     if err:
         return err
     if admin["admin_id"] == 0:
-        return {"enabled": False, "message": "Legacy admin does not support 2FA"}
+        val = await get_admin_setting("admin_2fa_enabled")
+        return {"enabled": val == "1"}
     admin_user = await get_admin_user_by_id(admin["admin_id"])
     if not admin_user:
         return {"error": "Admin not found"}
@@ -591,7 +603,13 @@ async def admin_2fa_setup(request: Request):
     if err:
         return err
     if admin["admin_id"] == 0:
-        return {"error": "Legacy admin cannot setup 2FA"}
+        val = await get_admin_setting("admin_2fa_enabled")
+        if val == "1":
+            return {"error": "2FA already enabled. Disable first."}
+        secret = generate_totp_secret()
+        await set_admin_setting("admin_2fa_secret", secret)
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=otpauth://totp/AdBot:super_admin?secret={secret}&issuer=AdBot&digits=6&period=30"
+        return {"secret": secret, "qr_url": qr_url}
     admin_user = await get_admin_user_by_id(admin["admin_id"])
     if not admin_user:
         return {"error": "Admin not found"}
@@ -610,12 +628,19 @@ async def admin_2fa_verify(request: Request):
     admin, err = await require_admin(request)
     if err:
         return err
-    if admin["admin_id"] == 0:
-        return {"error": "Legacy admin cannot use 2FA"}
     data = await request.json()
     code = data.get("code", "")
     if not code:
         return {"error": "Code required"}
+    if admin["admin_id"] == 0:
+        secret = await get_admin_setting("admin_2fa_secret")
+        if not secret:
+            return {"error": "Run setup first"}
+        if not verify_totp_code(secret, code):
+            return {"error": "Invalid code"}
+        await set_admin_setting("admin_2fa_enabled", "1")
+        await log_admin_action(0, "super_admin", "Enabled 2FA", "", "")
+        return {"status": "ok"}
     admin_user = await get_admin_user_by_id(admin["admin_id"])
     if not admin_user:
         return {"error": "Admin not found"}
@@ -634,12 +659,18 @@ async def admin_2fa_disable(request: Request):
     admin, err = await require_admin(request)
     if err:
         return err
-    if admin["admin_id"] == 0:
-        return {"error": "Legacy admin cannot use 2FA"}
     data = await request.json()
     password = data.get("password", "")
     if not password:
         return {"error": "Password required to disable 2FA"}
+    if admin["admin_id"] == 0:
+        stored = await get_admin_setting("admin_password")
+        if stored != password:
+            return {"error": "Wrong password"}
+        await set_admin_setting("admin_2fa_enabled", "0")
+        await set_admin_setting("admin_2fa_secret", "")
+        await log_admin_action(0, "super_admin", "Disabled 2FA", "", "")
+        return {"status": "ok"}
     admin_user = await get_admin_user_by_id(admin["admin_id"])
     if not admin_user:
         return {"error": "Admin not found"}
