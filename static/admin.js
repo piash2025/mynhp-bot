@@ -1591,6 +1591,35 @@ function searchAuditLogs() {
     _auditSearchTimer = setTimeout(function() { loadAuditLogs(1); }, 300);
 }
 
+// ===== ADMIN CHANGE PASSWORD =====
+function openChangePasswordModal() {
+    document.getElementById('cpw-current').value = '';
+    document.getElementById('cpw-new').value = '';
+    document.getElementById('cpw-confirm').value = '';
+    openModal('change-pw-modal');
+}
+
+async function changeAdminPassword() {
+    var current = document.getElementById('cpw-current').value;
+    var newPw = document.getElementById('cpw-new').value;
+    var confirm = document.getElementById('cpw-confirm').value;
+    if (!current || !newPw) { showToast('Fill in all fields', 'error'); return; }
+    if (newPw.length < 6) { showToast('Min 6 characters', 'error'); return; }
+    if (newPw !== confirm) { showToast('Passwords do not match', 'error'); return; }
+    try {
+        var resp = await fetch('/api/admin/change-password?password=' + adminToken, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ current_password: current, new_password: newPw }),
+        });
+        var data = await resp.json();
+        if (data.error) { showToast(data.error, 'error'); return; }
+        adminToken = newPw;
+        sessionStorage.setItem('adminToken', adminToken);
+        showToast('Password changed!', 'success');
+        closeModal('change-pw-modal');
+    } catch (e) { showToast('Failed', 'error'); }
+}
+
 // ===== AUTH CHECK ON LOAD =====
 (function checkAuth() {
     var loader = document.getElementById('auth-loader');

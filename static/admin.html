@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=21">
+    <link rel="stylesheet" href="/static/admin.css?v=22">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -114,6 +114,7 @@
                         <span class="header-title" id="header-title">Analytics Dashboard</span>
                     </div>
                     <div class="header-actions">
+                        <button class="quick-add-btn" onclick="openChangePasswordModal()">&#128274; Change Password</button>
                         <button class="quick-add-btn" onclick="openPlatformModal()">&#10010; Add Platform</button>
                     </div>
                 </header>
@@ -1063,6 +1064,34 @@
         </div>
     </div>
 
-    <script src="/static/admin.js?v=21"></script>
+    <!-- Change Password Modal -->
+    <div id="change-pw-modal" class="modal hidden">
+        <div class="modal-content" style="max-width:420px;">
+            <div class="modal-header" style="background:rgba(59,130,246,0.08);">
+                <h3>&#128274; Change Password</h3>
+                <button class="modal-close" onclick="closeModal('change-pw-modal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-field">
+                    <label>Current Password</label>
+                    <input type="password" id="cpw-current" placeholder="Enter current password">
+                </div>
+                <div class="modal-field">
+                    <label>New Password</label>
+                    <input type="password" id="cpw-new" placeholder="Min 6 characters">
+                </div>
+                <div class="modal-field">
+                    <label>Confirm New Password</label>
+                    <input type="password" id="cpw-confirm" placeholder="Confirm new password">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="modal-btn cancel" onclick="closeModal('change-pw-modal')">Cancel</button>
+                <button class="modal-btn confirm-approve" onclick="changeAdminPassword()">&#128190; Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/admin.js?v=22"></script>
 </body>
 </html>

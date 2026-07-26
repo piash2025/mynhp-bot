@@ -1182,6 +1182,33 @@ async def list_audit_logs(request: Request):
     return await get_admin_audit_logs(page=page, search=search)
 
 
+@app.post("/api/admin/change-password")
+async def admin_change_password(request: Request):
+    admin, err = await require_admin(request)
+    if err:
+        return err
+    data = await request.json()
+    current_password = data.get("current_password", "")
+    new_password = data.get("new_password", "")
+    if not current_password or not new_password:
+        return {"error": "Both current and new password required"}
+    if len(new_password) < 6:
+        return {"error": "New password must be at least 6 characters"}
+    if admin["admin_id"] == 0:
+        stored = await get_admin_setting("admin_password")
+        if stored != current_password:
+            return {"error": "Current password is wrong"}
+        await set_admin_setting("admin_password", new_password)
+    else:
+        admin_user = await get_admin_user_by_id(admin["admin_id"])
+        if not admin_user or not verify_password(current_password, admin_user["password_hash"], admin_user["salt"]):
+            return {"error": "Current password is wrong"}
+        pw_hash, salt = hash_password(new_password)
+        await update_admin_user(admin["admin_id"], password_hash=pw_hash, salt=salt)
+    await log_admin_action(admin["admin_id"], admin["username"], "Changed own password", "", "")
+    return {"status": "ok"}
+
+
 # ===== USER PASSWORD & 2FA =====
 
 @app.post("/api/user/set-password")
