@@ -246,7 +246,7 @@ async def init_db():
             "enable_strict_timer": "1",
             "auto_block_enabled": "0",
             "login_log_cleanup_enabled": "1",
-            "ad_cooldown_seconds": "0",
+            "ad_cooldown_seconds": "10",
         }
         for key, value in defaults.items():
             await db.execute("""

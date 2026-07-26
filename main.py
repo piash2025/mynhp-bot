@@ -403,7 +403,7 @@ async def tool_use(request: Request):
 
 @app.get("/api/user/ad-cooldown/{user_id}")
 async def get_ad_cooldown(user_id: int):
-    cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "0")
+    cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "10")
     if cooldown_secs <= 0:
         return {"cooldown": 0, "remaining": 0}
     last_claim = _ad_cooldowns.get(user_id)
@@ -490,7 +490,7 @@ async def update_user_balance(request: Request):
                 _ad_start_times.pop(user_id, None)
 
         # Ad cooldown — enforce wait between consecutive ad views
-        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "0")
+        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "10")
         if cooldown_secs > 0:
             last_claim = _ad_cooldowns.get(user_id)
             if last_claim:
@@ -525,7 +525,7 @@ async def update_user_balance(request: Request):
         await check_referral_release(user_id)
 
         # Record cooldown timestamp
-        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "0")
+        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "10")
         if cooldown_secs > 0:
             _ad_cooldowns[user_id] = time.time()
 
