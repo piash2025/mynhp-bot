@@ -7,6 +7,7 @@ import struct
 import base64
 import os
 import urllib.parse
+import aiosqlite
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -825,11 +826,10 @@ async def admin_stats(request: Request):
     total_users = await get_user_count()
     total_earnings = await get_total_earnings()
 
-    import sqlite3
-    conn = sqlite3.connect(DB_PATH)
-    row = conn.execute("SELECT COALESCE(SUM(total_referrals), 0) FROM users").fetchone()
-    conn.close()
-    total_referrals = row[0] if row else 0
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT COALESCE(SUM(total_referrals), 0) FROM users") as cursor:
+            row = await cursor.fetchone()
+            total_referrals = row[0] if row else 0
 
     withdrawal_stats = await get_withdrawal_stats()
     fraud_stats = await get_fraud_stats()
