@@ -22,6 +22,17 @@ function getOrCreateSessionId() {
 
 let userSessionId = getOrCreateSessionId();
 
+function showToast(message) {
+    const existing = document.querySelector('.user-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'user-toast';
+    toast.innerHTML = '<span>&#9888;</span> ' + message;
+    toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,0.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.4);display:flex;align-items:center;gap:8px;animation:slideIn 0.3s ease;';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
 function showSessionExpiredToast() {
     const existing = document.querySelector('.session-toast');
     if (existing) existing.remove();
@@ -342,9 +353,23 @@ function switchTab(tabName) {
 let currentAdNetwork = null;
 let adTimerInterval = null;
 
-function watchAd(network) {
+async function watchAd(network) {
     if (document.getElementById('banned-overlay') && !document.getElementById('banned-overlay').classList.contains('hidden')) {
         return;
+    }
+    if (cooldownInterval) {
+        return;
+    }
+    // Server-side cooldown check
+    if (currentUser?.id) {
+        try {
+            const resp = await fetch('/api/user/ad-cooldown/' + currentUser.id);
+            const cd = await resp.json();
+            if (cd.remaining > 0) {
+                startCooldownTimer(cd.remaining);
+                return;
+            }
+        } catch (e) { /* ignore */ }
     }
     currentAdNetwork = network;
     const modal = document.getElementById('ad-modal');
@@ -449,6 +474,9 @@ function claimReward() {
             tasksDone--;
             todayEarned -= reward;
             updateUI();
+        } else if (data.cooldown_remaining) {
+            showToast('Wait ' + data.cooldown_remaining + 's before next ad');
+            checkAdCooldown();
         } else if (data.status === 'ok') {
             hideVPNWarning();
             if (data.balance !== undefined) balance = data.balance;
