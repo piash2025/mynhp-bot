@@ -1719,7 +1719,7 @@ async function load2FAStatus() {
 
 async function open2FASetup() {
     try {
-        var resp = await fetch('/api/admin/2fa/setup', {
+        var resp = await fetch('/api/admin/2fa/setup?password=' + adminToken, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({}),
         });
