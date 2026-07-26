@@ -460,7 +460,7 @@ function loadAdScript(scriptCode, network) {
 function showAdSDK(zoneId) {
     var showFn = window['show_' + zoneId];
     if (!showFn) return Promise.reject(new Error('SDK not loaded'));
-    return showFn({ type: 'end', ymid: String(currentUser?.id || ''), requestVar: currentAdNetwork });
+    return showFn();
 }
 
 async function watchAd(network) {

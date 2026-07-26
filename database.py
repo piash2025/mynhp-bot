@@ -159,15 +159,27 @@ async def init_db():
 
         default_platforms = [
             ("AdsGram", "adsgream", "Rewarded Ad", 0.0005, 50),
-            ("Monetag", "monetag", "Rewarded Ad", 0.0005, 30),
+            ("Monetag", "monetag", "Rewarded Ad", "<script src='//libtl.com/sdk.js' data-zone='11414260' data-sdk='show_11414260'></script>", "11414260", 0.0005, 30),
             ("Adexium", "adexium", "Rewarded Ad", 0.0005, 40),
             ("Bonus", "bonus", "Bonus", 0.0050, 5),
         ]
-        for name, slug, ad_type, rate, limit in default_platforms:
-            await db.execute("""
-                INSERT OR IGNORE INTO ad_platforms (name, slug, ad_type, rate, daily_limit, enabled)
-                VALUES (?, ?, ?, ?, ?, 1)
-            """, (name, slug, ad_type, rate, limit))
+        for item in default_platforms:
+            if len(item) == 7:
+                name, slug, ad_type, script_code, placement_id, rate, limit = item
+                await db.execute("""
+                    INSERT OR IGNORE INTO ad_platforms (name, slug, ad_type, script_code, placement_id, rate, daily_limit, enabled)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                """, (name, slug, ad_type, script_code, placement_id, rate, limit))
+            else:
+                name, slug, ad_type, rate, limit = item
+                await db.execute("""
+                    INSERT OR IGNORE INTO ad_platforms (name, slug, ad_type, rate, daily_limit, enabled)
+                    VALUES (?, ?, ?, ?, ?, 1)
+                """, (name, slug, ad_type, rate, limit))
+
+        await db.execute("""
+            UPDATE ad_platforms SET script_code=?, placement_id=? WHERE slug='monetag' AND (script_code='' OR script_code IS NULL)
+        """, ("<script src='//libtl.com/sdk.js' data-zone='11414260' data-sdk='show_11414260'></script>", "11414260"))
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS daily_stats (
