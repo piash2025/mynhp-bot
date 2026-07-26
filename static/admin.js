@@ -618,6 +618,7 @@ function loadFraudSettings() {
             setToggle('set-auto-block', 'auto-block-label', settings.auto_block_enabled === '1');
             document.getElementById('set-max-ads-minute').value = settings.max_ads_per_minute || 10;
             document.getElementById('set-max-daily-withdrawals').value = settings.max_daily_withdrawals || 3;
+            document.getElementById('set-ad-cooldown').value = settings.ad_cooldown_seconds || 0;
         })
         .catch(function() {});
 }
@@ -654,6 +655,7 @@ async function saveFraudSettings() {
                 auto_block_enabled: document.getElementById('set-auto-block').checked ? '1' : '0',
                 max_ads_per_minute: document.getElementById('set-max-ads-minute').value,
                 max_daily_withdrawals: document.getElementById('set-max-daily-withdrawals').value,
+                ad_cooldown_seconds: document.getElementById('set-ad-cooldown').value || '0',
             }),
         });
         var data = await resp.json();

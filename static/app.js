@@ -146,6 +146,7 @@ if (tg?.initDataUnsafe?.user) {
     loadConfig();
     loadStats();
     loadUserData();
+    checkAdCooldown();
 
     // Heartbeat: ping server every 30s to track online status
     setInterval(function() {
@@ -165,6 +166,51 @@ async function loadConfig() {
         appConfig = await resp.json();
         updateAdCardsUI();
     } catch (e) { /* ignore */ }
+}
+
+// ===== AD COOLDOWN =====
+let cooldownInterval = null;
+
+async function checkAdCooldown() {
+    if (!currentUser?.id) return;
+    try {
+        const resp = await fetch('/api/user/ad-cooldown/' + currentUser.id);
+        const data = await resp.json();
+        if (data.remaining > 0) {
+            startCooldownTimer(data.remaining);
+        }
+    } catch (e) { /* ignore */ }
+}
+
+function startCooldownTimer(seconds) {
+    if (cooldownInterval) clearInterval(cooldownInterval);
+    let remaining = seconds;
+    const networks = ['adsgream', 'monetag', 'adexium', 'bonus'];
+    function updateButtons() {
+        networks.forEach(function(net) {
+            const btn = document.querySelector('#task-' + net + ' .watch-btn');
+            if (btn) {
+                if (remaining > 0) {
+                    btn.disabled = true;
+                    btn.textContent = remaining + 's';
+                    btn.style.opacity = '0.5';
+                    btn.style.cursor = 'not-allowed';
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = 'WATCH';
+                    btn.style.opacity = '1';
+                    btn.style.cursor = 'pointer';
+                }
+            }
+        });
+        if (remaining <= 0) {
+            clearInterval(cooldownInterval);
+            cooldownInterval = null;
+        }
+        remaining--;
+    }
+    updateButtons();
+    cooldownInterval = setInterval(updateButtons, 1000);
 }
 
 function formatUSDT(amount) {
@@ -409,6 +455,7 @@ function claimReward() {
             if (data.total_earned !== undefined) totalEarned = data.total_earned;
             if (data.tasks_done !== undefined) tasksDone = data.tasks_done;
             updateUI();
+            checkAdCooldown();
         }
     }).catch(function() {});
 }

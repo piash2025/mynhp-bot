@@ -277,6 +277,7 @@ def verify_telegram_initdata(init_data: str) -> dict:
 
 # ===== AD TIMING VALIDATION =====
 _ad_start_times = {}  # user_id -> timestamp when ad started
+_ad_cooldowns = {}    # user_id -> timestamp when last ad was claimed
 
 VPN_BLOCKED_RESPONSE = JSONResponse(
     status_code=403,
@@ -399,6 +400,19 @@ async def tool_use(request: Request):
     return {"status": "error", "message": "user_id required"}
 
 
+@app.get("/api/user/ad-cooldown/{user_id}")
+async def get_ad_cooldown(user_id: int):
+    cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "0")
+    if cooldown_secs <= 0:
+        return {"cooldown": 0, "remaining": 0}
+    last_claim = _ad_cooldowns.get(user_id)
+    if not last_claim:
+        return {"cooldown": cooldown_secs, "remaining": 0}
+    elapsed = time.time() - last_claim
+    remaining = max(0, cooldown_secs - elapsed)
+    return {"cooldown": cooldown_secs, "remaining": round(remaining)}
+
+
 @app.post("/api/user/heartbeat")
 async def user_heartbeat(request: Request):
     data = await request.json()
@@ -454,6 +468,16 @@ async def update_user_balance(request: Request):
                     return {"status": "error", "message": "Too fast. Please wait for the ad to finish.", "time_reject": True}
                 _ad_start_times.pop(user_id, None)
 
+        # Ad cooldown — enforce wait between consecutive ad views
+        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "0")
+        if cooldown_secs > 0:
+            last_claim = _ad_cooldowns.get(user_id)
+            if last_claim:
+                elapsed = time.time() - last_claim
+                if elapsed < cooldown_secs:
+                    remaining = round(cooldown_secs - elapsed)
+                    return {"status": "error", "message": f"Please wait {remaining}s before watching next ad.", "cooldown_remaining": remaining}
+
         # VPN soft warning
         ip = extract_ip(request)
         is_vpn = False
@@ -469,6 +493,11 @@ async def update_user_balance(request: Request):
         await update_balance(user_id, reward)
         await update_last_active(user_id)
         await check_referral_release(user_id)
+
+        # Record cooldown timestamp
+        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "0")
+        if cooldown_secs > 0:
+            _ad_cooldowns[user_id] = time.time()
 
         platform_name = data.get("platform_name", "")
         await create_task_activity(
@@ -765,7 +794,7 @@ async def admin_update_settings(request: Request):
         return err
     data = await request.json()
 
-    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral", "enable_initdata_check", "enable_single_device_login", "enable_strict_timer", "auto_block_enabled"]:
+    for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral", "enable_initdata_check", "enable_single_device_login", "enable_strict_timer", "auto_block_enabled", "ad_cooldown_seconds"]:
         if key in data and data[key]:
             await set_admin_setting(key, str(data[key]))
     return {"status": "ok"}
