@@ -233,6 +233,29 @@ function updateTaskCardsUI() {
     });
 }
 
+function showNoAdsModal(network) {
+    var modal = document.getElementById('ad-modal');
+    var title = document.getElementById('ad-modal-title');
+    var timer = document.getElementById('ad-timer');
+    var footer = document.getElementById('ad-modal-footer');
+    var body = document.getElementById('ad-modal-body');
+    var networkNames = { 'adsgream': 'AdsGram', 'monetag': 'Monetag', 'adexium': 'Adexium', 'bonus': 'Bonus Offer' };
+
+    title.textContent = networkNames[network] || network;
+    timer.textContent = '';
+    footer.classList.add('hidden');
+    body.innerHTML = '<div class="ad-placeholder">' +
+        '<span style="font-size:48px;">&#128269;</span>' +
+        '<p style="font-size:16px;font-weight:700;margin-top:12px;">No Ads Found</p>' +
+        '<p style="color:var(--text-secondary);font-size:13px;margin-top:6px;">No ads available for this platform right now.</p>' +
+        '<p style="color:var(--text-muted);font-size:12px;margin-top:10px;">Try again later</p>' +
+        '</div>';
+    modal.classList.remove('hidden');
+    setTimeout(function() {
+        modal.classList.add('hidden');
+    }, 3000);
+}
+
 // ===== AD COOLDOWN (per-platform) =====
 
 async function checkAdCooldown() {
@@ -425,6 +448,17 @@ async function watchAd(network) {
     if (netInfo && netInfo.cooldown_remaining > 0) {
         startCooldownTimer(network, netInfo.cooldown_remaining);
         return;
+    }
+    // Check if ads are actually available for this platform
+    if (currentUser?.id) {
+        try {
+            var checkResp = await fetch('/api/user/ad-check/' + currentUser.id + '/' + network);
+            var checkData = await checkResp.json();
+            if (!checkData.available) {
+                showNoAdsModal(network);
+                return;
+            }
+        } catch (e) { /* proceed anyway */ }
     }
     // Server-side cooldown check
     if (currentUser?.id) {

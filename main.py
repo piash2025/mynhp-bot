@@ -466,6 +466,20 @@ async def get_ad_status(user_id: int):
     return {"status": status}
 
 
+@app.get("/api/user/ad-check/{user_id}/{network}")
+async def check_ad_available(user_id: int, network: str):
+    """Check if ads are loaded for a platform. Returns available flag."""
+    rate = await get_ad_rate(network)
+    if not rate or not rate.get("enabled"):
+        return {"available": False, "reason": "disabled"}
+    platform = await get_platform_by_slug(network)
+    if not platform:
+        return {"available": False, "reason": "not_configured"}
+    if not platform.get("script_code") and not platform.get("placement_id"):
+        return {"available": False, "reason": "no_ads"}
+    return {"available": True}
+
+
 @app.post("/api/user/heartbeat")
 async def user_heartbeat(request: Request):
     data = await request.json()
