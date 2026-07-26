@@ -795,7 +795,7 @@ async def admin_update_settings(request: Request):
     data = await request.json()
 
     for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral", "enable_initdata_check", "enable_single_device_login", "enable_strict_timer", "auto_block_enabled", "ad_cooldown_seconds"]:
-        if key in data and data[key]:
+        if key in data and data[key] is not None and data[key] != "":
             await set_admin_setting(key, str(data[key]))
     return {"status": "ok"}
 
