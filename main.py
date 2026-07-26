@@ -789,10 +789,13 @@ async def admin_get_settings(request: Request):
 
 @app.post("/api/admin/settings")
 async def admin_update_settings(request: Request):
-    admin, err = await require_admin(request, "manage_settings")
-    if err:
-        return err
     data = await request.json()
+    password = data.get("password", "")
+    admin = await authenticate_admin(password, request)
+    if not admin:
+        return {"error": "Unauthorized"}
+    if not has_permission(admin, "manage_settings"):
+        return {"error": "Forbidden", "message": "Missing permission: manage_settings"}
 
     for key in ["referral_reward", "min_withdraw", "farm_rate", "farm_duration_hours", "admin_password", "vpn_blocker", "max_ads_per_minute", "max_daily_withdrawals", "min_ads_for_referral", "enable_initdata_check", "enable_single_device_login", "enable_strict_timer", "auto_block_enabled", "ad_cooldown_seconds"]:
         if key in data and data[key] is not None and data[key] != "":
