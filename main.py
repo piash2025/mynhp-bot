@@ -73,6 +73,7 @@ from database import (
     get_live_users_count,
     create_task_activity,
     get_task_activities,
+    get_user_today_earned,
     get_task_activity_stats,
     create_transaction,
     get_accounting_summary,
@@ -615,11 +616,13 @@ async def update_user_balance(request: Request):
 
         user = await get_user(user_id)
         if user:
+            today_earned = await get_user_today_earned(user_id)
             return {
                 "status": "ok",
                 "balance": user.get("balance", 0),
                 "tasks_done": user.get("tasks_done", 0),
                 "total_earned": user.get("total_earned", 0),
+                "today_earned": today_earned,
             }
     return {"status": "error", "message": "user_id and reward required"}
 
@@ -632,7 +635,8 @@ async def get_user_info(user_id: int, session_id: str = ""):
             return BANNED_RESPONSE
         if session_id and not await check_user_session(user_id, session_id):
             return SESSION_EXPIRED_RESPONSE
-        return user
+        today_earned = await get_user_today_earned(user_id)
+        return {**user, "today_earned": today_earned}
     return {"error": "User not found"}
 
 

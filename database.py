@@ -373,6 +373,16 @@ async def get_user(user_id: int) -> Optional[dict]:
             return dict(row) if row else None
 
 
+async def get_user_today_earned(user_id: int) -> float:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT COALESCE(SUM(reward_amount), 0) FROM task_activities WHERE user_id = ? AND DATE(timestamp) = DATE('now')",
+            (user_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return float(row[0]) if row else 0.0
+
+
 async def update_balance(user_id: int, reward: float):
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""

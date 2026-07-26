@@ -358,9 +358,10 @@ async function loadUserData() {
             showBannedScreen();
             return;
         }
-        if (data.balance !== undefined) {
-            balance = data.balance;
-        }
+        if (data.balance !== undefined) balance = data.balance;
+        if (data.tasks_done !== undefined) tasksDone = data.tasks_done;
+        if (data.total_earned !== undefined) totalEarned = data.total_earned;
+        if (data.today_earned !== undefined) todayEarned = data.today_earned;
         const refCount = data.total_referrals || 0;
         const refEarned = data.referral_earned || 0;
 
@@ -583,10 +584,6 @@ async function watchAd(network) {
 function claimReward() {
     const rateData = appConfig.ad_rates[currentAdNetwork];
     const reward = rateData ? rateData.rate : 0.0005;
-    balance += reward;
-    totalEarned += reward;
-    todayEarned += reward;
-    tasksDone++;
 
     updateUI();
 
@@ -616,10 +613,6 @@ function claimReward() {
             showToast('Daily limit reached for this platform');
             loadAdStatus();
         } else if (data.time_reject) {
-            balance -= reward;
-            totalEarned -= reward;
-            tasksDone--;
-            todayEarned -= reward;
             updateUI();
         } else if (data.cooldown_remaining) {
             showToast('Wait ' + data.cooldown_remaining + 's before next ' + (data.platform || '') + ' ad');
@@ -629,6 +622,7 @@ function claimReward() {
             if (data.balance !== undefined) balance = data.balance;
             if (data.total_earned !== undefined) totalEarned = data.total_earned;
             if (data.tasks_done !== undefined) tasksDone = data.tasks_done;
+            if (data.today_earned !== undefined) todayEarned = data.today_earned;
             updateUI();
             checkAdCooldown();
             loadAdStatus();
