@@ -72,9 +72,15 @@ async def init_db():
                 network TEXT UNIQUE NOT NULL,
                 rate REAL DEFAULT 0.0005,
                 daily_limit INTEGER DEFAULT 50,
+                cooldown_seconds INTEGER DEFAULT 10,
                 enabled INTEGER DEFAULT 1
             )
         """)
+
+        try:
+            await db.execute("ALTER TABLE ad_rates ADD COLUMN cooldown_seconds INTEGER DEFAULT 10")
+        except Exception:
+            pass
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS referrals (
@@ -371,12 +377,14 @@ async def get_all_ad_rates() -> List[dict]:
             return [dict(r) for r in rows]
 
 
-async def update_ad_rate(network: str, rate: float = None, daily_limit: int = None, enabled: int = None):
+async def update_ad_rate(network: str, rate: float = None, daily_limit: int = None, cooldown_seconds: int = None, enabled: int = None):
     async with aiosqlite.connect(DB_PATH) as db:
         if rate is not None:
             await db.execute("UPDATE ad_rates SET rate = ? WHERE network = ?", (rate, network))
         if daily_limit is not None:
             await db.execute("UPDATE ad_rates SET daily_limit = ? WHERE network = ?", (daily_limit, network))
+        if cooldown_seconds is not None:
+            await db.execute("UPDATE ad_rates SET cooldown_seconds = ? WHERE network = ?", (cooldown_seconds, network))
         if enabled is not None:
             await db.execute("UPDATE ad_rates SET enabled = ? WHERE network = ?", (enabled, network))
         await db.commit()

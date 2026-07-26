@@ -224,7 +224,7 @@ function updateTaskCardsUI() {
                 btn.disabled = true;
                 btn.textContent = 'COMPLETED';
                 btn.className = btn.className.replace(/btn-cooldown/g, '') + ' btn-completed';
-            } else if (!cooldownInterval) {
+            } else {
                 btn.disabled = false;
                 btn.textContent = 'WATCH';
                 btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '');
@@ -233,53 +233,54 @@ function updateTaskCardsUI() {
     });
 }
 
-// ===== AD COOLDOWN =====
-let cooldownInterval = null;
+// ===== AD COOLDOWN (per-platform) =====
 
 async function checkAdCooldown() {
     if (!currentUser?.id) return;
     try {
         const resp = await fetch('/api/user/ad-cooldown/' + currentUser.id);
         const data = await resp.json();
-        if (data.remaining > 0) {
-            startCooldownTimer(data.remaining);
+        if (data.platforms) {
+            Object.keys(data.platforms).forEach(function(net) {
+                var cd = data.platforms[net];
+                if (cd.remaining > 0) {
+                    startCooldownTimer(net, cd.remaining);
+                }
+            });
         }
     } catch (e) { /* ignore */ }
 }
 
-function startCooldownTimer(seconds) {
-    if (cooldownInterval) clearInterval(cooldownInterval);
-    let remaining = seconds;
-    const networks = ['adsgream', 'monetag', 'adexium', 'bonus'];
-    function updateButtons() {
-        networks.forEach(function(net) {
-            const btn = document.getElementById('btn-' + net);
-            if (!btn) return;
-            const info = userAdStatus[net];
-            if (info && info.completed) {
-                btn.disabled = true;
-                btn.textContent = 'COMPLETED';
-                btn.className = btn.className.replace(/btn-cooldown/g, '').replace(/btn-completed/g, '') + ' btn-completed';
-                return;
-            }
-            if (remaining > 0) {
-                btn.disabled = true;
-                btn.textContent = remaining + 's';
-                btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '') + ' btn-cooldown';
-            } else {
-                btn.disabled = false;
-                btn.textContent = 'WATCH';
-                btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '');
-            }
-        });
-        if (remaining <= 0) {
-            clearInterval(cooldownInterval);
-            cooldownInterval = null;
+function startCooldownTimer(network, seconds) {
+    var key = 'cd_' + network;
+    if (window[key]) clearInterval(window[key]);
+    var remaining = seconds;
+    function updateButton() {
+        var btn = document.getElementById('btn-' + network);
+        if (!btn) return;
+        var info = userAdStatus[network];
+        if (info && info.completed) {
+            btn.disabled = true;
+            btn.textContent = 'COMPLETED';
+            btn.className = btn.className.replace(/btn-cooldown/g, '').replace(/btn-completed/g, '') + ' btn-completed';
+            clearInterval(window[key]);
+            return;
         }
-        remaining--;
+        if (remaining > 0) {
+            btn.disabled = true;
+            btn.textContent = remaining + 's';
+            btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '') + ' btn-cooldown';
+            remaining--;
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'WATCH';
+            btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '');
+            clearInterval(window[key]);
+            window[key] = null;
+        }
     }
-    updateButtons();
-    cooldownInterval = setInterval(updateButtons, 1000);
+    updateButton();
+    window[key] = setInterval(updateButton, 1000);
 }
 
 function formatUSDT(amount) {
@@ -412,12 +413,17 @@ async function watchAd(network) {
     if (document.getElementById('banned-overlay') && !document.getElementById('banned-overlay').classList.contains('hidden')) {
         return;
     }
-    if (cooldownInterval) {
+    var cdKey = 'cd_' + network;
+    if (window[cdKey]) {
         return;
     }
     var netInfo = userAdStatus[network];
     if (netInfo && netInfo.completed) {
         showToast('Daily limit reached for ' + network);
+        return;
+    }
+    if (netInfo && netInfo.cooldown_remaining > 0) {
+        startCooldownTimer(network, netInfo.cooldown_remaining);
         return;
     }
     // Server-side cooldown check
@@ -537,8 +543,8 @@ function claimReward() {
             todayEarned -= reward;
             updateUI();
         } else if (data.cooldown_remaining) {
-            showToast('Wait ' + data.cooldown_remaining + 's before next ad');
-            checkAdCooldown();
+            showToast('Wait ' + data.cooldown_remaining + 's before next ' + (data.platform || '') + ' ad');
+            if (data.platform) startCooldownTimer(data.platform, data.cooldown_remaining);
         } else if (data.status === 'ok') {
             hideVPNWarning();
             if (data.balance !== undefined) balance = data.balance;

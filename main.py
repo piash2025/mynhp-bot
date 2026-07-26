@@ -402,21 +402,37 @@ async def tool_use(request: Request):
 
 
 @app.get("/api/user/ad-cooldown/{user_id}")
-async def get_ad_cooldown(user_id: int):
-    cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "10")
-    if cooldown_secs <= 0:
-        return {"cooldown": 0, "remaining": 0}
-    last_claim = _ad_cooldowns.get(user_id)
-    if not last_claim:
-        return {"cooldown": cooldown_secs, "remaining": 0}
-    elapsed = time.time() - last_claim
-    remaining = max(0, cooldown_secs - elapsed)
-    return {"cooldown": cooldown_secs, "remaining": round(remaining)}
+async def get_ad_cooldown(user_id: int, platform: str = ""):
+    """Return per-platform cooldown status. If no platform, return all platforms."""
+    if platform:
+        rate = await get_ad_rate(platform)
+        cooldown_secs = rate.get("cooldown_seconds", 10) if rate else 10
+        if cooldown_secs <= 0:
+            return {"cooldown": 0, "remaining": 0}
+        last_claim = _ad_cooldowns.get((user_id, platform))
+        if not last_claim:
+            return {"platform": platform, "cooldown": cooldown_secs, "remaining": 0}
+        elapsed = time.time() - last_claim
+        remaining = max(0, cooldown_secs - elapsed)
+        return {"platform": platform, "cooldown": cooldown_secs, "remaining": round(remaining)}
+    else:
+        rates = await get_all_ad_rates()
+        result = {}
+        for r in rates:
+            net = r["network"]
+            cd = r.get("cooldown_seconds", 10)
+            last_claim = _ad_cooldowns.get((user_id, net))
+            if not last_claim or cd <= 0:
+                result[net] = {"cooldown": cd, "remaining": 0}
+            else:
+                elapsed = time.time() - last_claim
+                result[net] = {"cooldown": cd, "remaining": round(max(0, cd - elapsed))}
+        return {"platforms": result}
 
 
 @app.get("/api/user/ad-status/{user_id}")
 async def get_ad_status(user_id: int):
-    """Return daily counts per platform + rate limits for the user."""
+    """Return daily counts per platform + rate limits + cooldown for the user."""
     rates = await get_all_ad_rates()
     daily_counts = await get_user_daily_task_counts(user_id)
     status = {}
@@ -424,12 +440,21 @@ async def get_ad_status(user_id: int):
         net = r["network"]
         count = daily_counts.get(net, 0)
         limit = r["daily_limit"]
+        cd = r.get("cooldown_seconds", 10)
+        last_claim = _ad_cooldowns.get((user_id, net))
+        if not last_claim or cd <= 0:
+            cd_remaining = 0
+        else:
+            elapsed = time.time() - last_claim
+            cd_remaining = round(max(0, cd - elapsed))
         status[net] = {
             "count": count,
             "limit": limit,
             "remaining": max(0, limit - count),
             "completed": count >= limit,
             "rate": r["rate"],
+            "cooldown": cd,
+            "cooldown_remaining": cd_remaining,
         }
     return {"status": status}
 
@@ -489,20 +514,20 @@ async def update_user_balance(request: Request):
                     return {"status": "error", "message": "Too fast. Please wait for the ad to finish.", "time_reject": True}
                 _ad_start_times.pop(user_id, None)
 
-        # Ad cooldown — enforce wait between consecutive ad views
-        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "10")
-        if cooldown_secs > 0:
-            last_claim = _ad_cooldowns.get(user_id)
-            if last_claim:
-                elapsed = time.time() - last_claim
-                if elapsed < cooldown_secs:
-                    remaining = round(cooldown_secs - elapsed)
-                    return {"status": "error", "message": f"Please wait {remaining}s before watching next ad.", "cooldown_remaining": remaining}
-
-        # Daily limit per platform enforcement
+        # Ad cooldown — per-platform enforcement
         platform_name = data.get("platform_name", "")
         if platform_name:
             rate_data = await get_ad_rate(platform_name)
+            cooldown_secs = rate_data.get("cooldown_seconds", 10) if rate_data else 10
+            if cooldown_secs > 0:
+                last_claim = _ad_cooldowns.get((user_id, platform_name))
+                if last_claim:
+                    elapsed = time.time() - last_claim
+                    if elapsed < cooldown_secs:
+                        remaining = round(cooldown_secs - elapsed)
+                        return {"status": "error", "message": f"Please wait {remaining}s before watching next {platform_name} ad.", "cooldown_remaining": remaining, "platform": platform_name}
+
+            # Daily limit per platform enforcement
             if rate_data and rate_data.get("daily_limit", 0) > 0:
                 daily_counts = await get_user_daily_task_counts(user_id)
                 if daily_counts.get(platform_name, 0) >= rate_data["daily_limit"]:
@@ -524,10 +549,12 @@ async def update_user_balance(request: Request):
         await update_last_active(user_id)
         await check_referral_release(user_id)
 
-        # Record cooldown timestamp
-        cooldown_secs = int(await get_admin_setting("ad_cooldown_seconds") or "10")
-        if cooldown_secs > 0:
-            _ad_cooldowns[user_id] = time.time()
+        # Record per-platform cooldown timestamp
+        if platform_name:
+            rate_data_cd = await get_ad_rate(platform_name)
+            cd = rate_data_cd.get("cooldown_seconds", 10) if rate_data_cd else 10
+            if cd > 0:
+                _ad_cooldowns[(user_id, platform_name)] = time.time()
 
         await create_task_activity(
             user_id=user_id,
@@ -584,7 +611,7 @@ async def get_public_config():
     rates = await get_all_ad_rates()
     settings = await get_all_admin_settings()
     return {
-        "ad_rates": {r["network"]: {"rate": r["rate"], "daily_limit": r["daily_limit"], "enabled": r["enabled"]} for r in rates},
+        "ad_rates": {r["network"]: {"rate": r["rate"], "daily_limit": r["daily_limit"], "cooldown_seconds": r.get("cooldown_seconds", 10), "enabled": r["enabled"]} for r in rates},
         "farm_rate": float(settings.get("farm_rate", "0.001")),
         "farm_duration_hours": float(settings.get("farm_duration_hours", "4")),
         "referral_reward": float(settings.get("referral_reward", "0.001")),
@@ -803,6 +830,7 @@ async def admin_update_rate(network: str, request: Request):
         network,
         rate=data.get("rate"),
         daily_limit=data.get("daily_limit"),
+        cooldown_seconds=data.get("cooldown_seconds"),
         enabled=data.get("enabled"),
     )
     return {"status": "ok"}

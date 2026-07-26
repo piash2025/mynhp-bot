@@ -288,6 +288,8 @@ async function loadRates() {
                 '<input type="number" step="0.000001" value="' + rate.rate + '" data-network="' + rate.network + '" data-field="rate"></div>' +
                 '<div><label>Daily Limit</label>' +
                 '<input type="number" value="' + rate.daily_limit + '" data-network="' + rate.network + '" data-field="daily_limit"></div>' +
+                '<div><label>Cooldown (sec)</label>' +
+                '<input type="number" value="' + (rate.cooldown_seconds || 10) + '" min="0" max="300" data-network="' + rate.network + '" data-field="cooldown_seconds"></div>' +
                 '<div><label>Enabled</label><label class="toggle">' +
                 '<input type="checkbox" ' + (rate.enabled ? 'checked' : '') + ' data-network="' + rate.network + '" data-field="enabled" onchange="toggleRate(this)">' +
                 '<span class="slider"></span></label></div></div>';
@@ -305,6 +307,7 @@ async function saveAllRates() {
         var card = cards[i];
         var rateInput = card.querySelector('[data-field="rate"]');
         var limitInput = card.querySelector('[data-field="daily_limit"]');
+        var cooldownInput = card.querySelector('[data-field="cooldown_seconds"]');
         var enabledInput = card.querySelector('[data-field="enabled"]');
         var network = rateInput.dataset.network;
         await fetch('/api/admin/rates/' + network, {
@@ -314,6 +317,7 @@ async function saveAllRates() {
                 password: adminToken,
                 rate: parseFloat(rateInput.value),
                 daily_limit: parseInt(limitInput.value),
+                cooldown_seconds: parseInt(cooldownInput ? cooldownInput.value : 10),
                 enabled: enabledInput.checked ? 1 : 0,
             }),
         });
@@ -618,7 +622,6 @@ function loadFraudSettings() {
             setToggle('set-auto-block', 'auto-block-label', settings.auto_block_enabled === '1');
             document.getElementById('set-max-ads-minute').value = settings.max_ads_per_minute || 10;
             document.getElementById('set-max-daily-withdrawals').value = settings.max_daily_withdrawals || 3;
-            document.getElementById('set-ad-cooldown').value = settings.ad_cooldown_seconds || 0;
         })
         .catch(function() {});
 }
@@ -655,7 +658,6 @@ async function saveFraudSettings() {
                 auto_block_enabled: document.getElementById('set-auto-block').checked ? '1' : '0',
                 max_ads_per_minute: document.getElementById('set-max-ads-minute').value,
                 max_daily_withdrawals: document.getElementById('set-max-daily-withdrawals').value,
-                ad_cooldown_seconds: document.getElementById('set-ad-cooldown').value || '0',
             }),
         });
         var data = await resp.json();
