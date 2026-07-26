@@ -175,9 +175,16 @@ def has_permission(admin: dict, perm: str) -> bool:
 
 
 async def require_admin(request: Request, permission: str = None):
-    """Extract password from query params, authenticate, optionally check permission.
+    """Extract password from query params or JSON body, authenticate, optionally check permission.
     Returns (admin_info, error_response). error_response is None if OK."""
     password = request.query_params.get("password", "")
+    if not password:
+        try:
+            body = await request.json()
+            password = body.get("password", "")
+            request._json_body = body
+        except Exception:
+            pass
     admin = await authenticate_admin(password, request)
     if not admin:
         return None, {"error": "Unauthorized"}
