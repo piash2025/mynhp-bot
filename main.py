@@ -826,7 +826,7 @@ async def admin_stats(request: Request):
     total_earnings = await get_total_earnings()
 
     import sqlite3
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect(DB_PATH)
     row = conn.execute("SELECT COALESCE(SUM(total_referrals), 0) FROM users").fetchone()
     conn.close()
     total_referrals = row[0] if row else 0
