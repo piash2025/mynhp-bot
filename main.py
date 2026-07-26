@@ -25,6 +25,7 @@ from database import (
     get_all_ad_rates,
     update_ad_rate,
     get_all_admin_settings,
+    get_user_daily_task_counts,
     set_admin_setting,
     get_admin_setting,
     get_total_earnings,
@@ -413,6 +414,26 @@ async def get_ad_cooldown(user_id: int):
     return {"cooldown": cooldown_secs, "remaining": round(remaining)}
 
 
+@app.get("/api/user/ad-status/{user_id}")
+async def get_ad_status(user_id: int):
+    """Return daily counts per platform + rate limits for the user."""
+    rates = await get_all_ad_rates()
+    daily_counts = await get_user_daily_task_counts(user_id)
+    status = {}
+    for r in rates:
+        net = r["network"]
+        count = daily_counts.get(net, 0)
+        limit = r["daily_limit"]
+        status[net] = {
+            "count": count,
+            "limit": limit,
+            "remaining": max(0, limit - count),
+            "completed": count >= limit,
+            "rate": r["rate"],
+        }
+    return {"status": status}
+
+
 @app.post("/api/user/heartbeat")
 async def user_heartbeat(request: Request):
     data = await request.json()
@@ -478,6 +499,15 @@ async def update_user_balance(request: Request):
                     remaining = round(cooldown_secs - elapsed)
                     return {"status": "error", "message": f"Please wait {remaining}s before watching next ad.", "cooldown_remaining": remaining}
 
+        # Daily limit per platform enforcement
+        platform_name = data.get("platform_name", "")
+        if platform_name:
+            rate_data = await get_ad_rate(platform_name)
+            if rate_data and rate_data.get("daily_limit", 0) > 0:
+                daily_counts = await get_user_daily_task_counts(user_id)
+                if daily_counts.get(platform_name, 0) >= rate_data["daily_limit"]:
+                    return {"status": "error", "message": "Daily limit reached for this platform.", "daily_limit_reached": True}
+
         # VPN soft warning
         ip = extract_ip(request)
         is_vpn = False
@@ -499,7 +529,6 @@ async def update_user_balance(request: Request):
         if cooldown_secs > 0:
             _ad_cooldowns[user_id] = time.time()
 
-        platform_name = data.get("platform_name", "")
         await create_task_activity(
             user_id=user_id,
             username=user.get("username", "") if user else "",

@@ -2,6 +2,7 @@ from typing import Optional, List, Dict
 import json
 import hashlib
 import os
+from datetime import datetime, timezone
 
 import aiosqlite
 
@@ -1055,6 +1056,20 @@ async def cleanup_old_login_logs(days: int = 30) -> int:
 
 
 # ===== TASK ACTIVITIES =====
+
+async def get_user_daily_task_counts(user_id: int) -> dict:
+    """Return {platform_name: count} for today's completed tasks by this user."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT platform_name, COUNT(*) as cnt FROM task_activities "
+            "WHERE user_id = ? AND status = 'COMPLETED' AND date(timestamp) = ? "
+            "GROUP BY platform_name",
+            (user_id, today)
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: row[1] for row in rows}
+
 
 async def create_task_activity(user_id: int, username: str = "", first_name: str = "",
                                platform_name: str = "", ad_type: str = "Rewarded",

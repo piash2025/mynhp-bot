@@ -33,6 +33,17 @@ function showToast(message) {
     setTimeout(() => toast.remove(), 3000);
 }
 
+function showRewardToast(amount) {
+    const existing = document.querySelector('.reward-toast');
+    if (existing) existing.remove();
+    const toast = document.createElement('div');
+    toast.className = 'reward-toast';
+    toast.innerHTML = '&#127881; +' + formatUSDT(amount) + ' USDT added!';
+    toast.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);background:rgba(22,163,74,0.95);color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;font-weight:600;z-index:99999;box-shadow:0 8px 24px rgba(0,0,0,0.4);display:flex;align-items:center;gap:8px;animation:slideIn 0.3s ease;';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 2500);
+}
+
 function showSessionExpiredToast() {
     const existing = document.querySelector('.session-toast');
     if (existing) existing.remove();
@@ -115,6 +126,7 @@ let isFarming = false;
 let farmInterval = null;
 let farmStartTime = null;
 let farmBalance = 0;
+let userAdStatus = {};
 
 // ===== CONFIG (fetched from API) =====
 let appConfig = {
@@ -158,6 +170,7 @@ if (tg?.initDataUnsafe?.user) {
     loadStats();
     loadUserData();
     checkAdCooldown();
+    loadAdStatus();
 
     // Heartbeat: ping server every 30s to track online status
     setInterval(function() {
@@ -177,6 +190,47 @@ async function loadConfig() {
         appConfig = await resp.json();
         updateAdCardsUI();
     } catch (e) { /* ignore */ }
+}
+
+async function loadAdStatus() {
+    if (!currentUser?.id) return;
+    try {
+        const resp = await fetch('/api/user/ad-status/' + currentUser.id);
+        const data = await resp.json();
+        if (data.status) {
+            userAdStatus = data.status;
+            updateTaskCardsUI();
+        }
+    } catch (e) { /* ignore */ }
+}
+
+function updateTaskCardsUI() {
+    const networks = ['adsgream', 'monetag', 'adexium', 'bonus'];
+    networks.forEach(function(net) {
+        const info = userAdStatus[net];
+        if (!info) return;
+        const progressFill = document.getElementById('progress-' + net);
+        const progressText = document.getElementById('progress-text-' + net);
+        const limitEl = document.getElementById('limit-' + net);
+        const btn = document.getElementById('btn-' + net);
+        const pct = info.limit > 0 ? Math.min(100, (info.count / info.limit) * 100) : 0;
+
+        if (progressFill) progressFill.style.width = pct + '%';
+        if (progressText) progressText.textContent = info.count + '/' + info.limit;
+        if (limitEl) limitEl.textContent = 'Daily limit: ' + info.count + '/' + info.limit;
+
+        if (btn) {
+            if (info.completed) {
+                btn.disabled = true;
+                btn.textContent = 'COMPLETED';
+                btn.className = btn.className.replace(/btn-cooldown/g, '') + ' btn-completed';
+            } else if (!cooldownInterval) {
+                btn.disabled = false;
+                btn.textContent = 'WATCH';
+                btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '');
+            }
+        }
+    });
 }
 
 // ===== AD COOLDOWN =====
@@ -199,19 +253,23 @@ function startCooldownTimer(seconds) {
     const networks = ['adsgream', 'monetag', 'adexium', 'bonus'];
     function updateButtons() {
         networks.forEach(function(net) {
-            const btn = document.querySelector('#task-' + net + ' .watch-btn');
-            if (btn) {
-                if (remaining > 0) {
-                    btn.disabled = true;
-                    btn.textContent = remaining + 's';
-                    btn.style.opacity = '0.5';
-                    btn.style.cursor = 'not-allowed';
-                } else {
-                    btn.disabled = false;
-                    btn.textContent = 'WATCH';
-                    btn.style.opacity = '1';
-                    btn.style.cursor = 'pointer';
-                }
+            const btn = document.getElementById('btn-' + net);
+            if (!btn) return;
+            const info = userAdStatus[net];
+            if (info && info.completed) {
+                btn.disabled = true;
+                btn.textContent = 'COMPLETED';
+                btn.className = btn.className.replace(/btn-cooldown/g, '').replace(/btn-completed/g, '') + ' btn-completed';
+                return;
+            }
+            if (remaining > 0) {
+                btn.disabled = true;
+                btn.textContent = remaining + 's';
+                btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '') + ' btn-cooldown';
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'WATCH';
+                btn.className = btn.className.replace(/btn-completed/g, '').replace(/btn-cooldown/g, '');
             }
         });
         if (remaining <= 0) {
@@ -237,13 +295,9 @@ function updateAdCardsUI() {
         const rateData = appConfig.ad_rates[net];
         if (!rateData) return;
         const rewardEl = document.getElementById('reward-' + net);
-        const limitEl = document.getElementById('limit-' + net);
         const cardEl = document.getElementById('task-' + net);
         if (rewardEl) {
             rewardEl.textContent = '+' + formatUSDT(rateData.rate) + ' USDT';
-        }
-        if (limitEl) {
-            limitEl.textContent = 'Daily limit: ' + rateData.daily_limit + '/' + rateData.daily_limit;
         }
         if (cardEl) {
             cardEl.style.display = rateData.enabled ? '' : 'none';
@@ -251,6 +305,7 @@ function updateAdCardsUI() {
     });
     document.getElementById('farm-rate-text').textContent = formatUSDT(appConfig.farm_rate);
     document.getElementById('farm-duration-text').textContent = appConfig.farm_duration_hours;
+    loadAdStatus();
 }
 
 async function loadStats() {
@@ -360,6 +415,11 @@ async function watchAd(network) {
     if (cooldownInterval) {
         return;
     }
+    var netInfo = userAdStatus[network];
+    if (netInfo && netInfo.completed) {
+        showToast('Daily limit reached for ' + network);
+        return;
+    }
     // Server-side cooldown check
     if (currentUser?.id) {
         try {
@@ -467,8 +527,10 @@ function claimReward() {
             showBannedScreen();
         } else if (data.vpn_warning) {
             showVPNWarning(data.message);
+        } else if (data.daily_limit_reached) {
+            showToast('Daily limit reached for this platform');
+            loadAdStatus();
         } else if (data.time_reject) {
-            // Silently reject — user tried to skip ad timer
             balance -= reward;
             totalEarned -= reward;
             tasksDone--;
@@ -484,6 +546,8 @@ function claimReward() {
             if (data.tasks_done !== undefined) tasksDone = data.tasks_done;
             updateUI();
             checkAdCooldown();
+            loadAdStatus();
+            showRewardToast(reward);
         }
     }).catch(function() {});
 }

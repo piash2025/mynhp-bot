@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>mynhp_bot</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="/static/style.css?v=21">
+    <link rel="stylesheet" href="/static/style.css?v=22">
 </head>
 <body>
     <div class="app">
@@ -92,9 +92,13 @@
                             <div class="task-reward" id="reward-adsgream">+0.0005 USDT</div>
                         </div>
                         <p class="task-desc">Watch a short video ad and earn instant USDT reward. Fast &amp; easy!</p>
+                        <div class="task-progress-wrap">
+                            <div class="task-progress-bar"><div class="task-progress-fill" id="progress-adsgream"></div></div>
+                            <span class="task-progress-text" id="progress-text-adsgream">0/50</span>
+                        </div>
                         <div class="task-footer">
-                            <span class="task-limit" id="limit-adsgream">Daily limit: 50/50</span>
-                            <button class="watch-btn" onclick="watchAd('adsgream')">WATCH</button>
+                            <span class="task-limit" id="limit-adsgream">Daily limit: 0/50</span>
+                            <button class="watch-btn" id="btn-adsgream" onclick="watchAd('adsgream')">WATCH</button>
                         </div>
                     </div>
 
@@ -111,9 +115,13 @@
                             <div class="task-reward" id="reward-monetag">+0.0005 USDT</div>
                         </div>
                         <p class="task-desc">View a full-screen interstitial ad. Higher engagement = bonus reward!</p>
+                        <div class="task-progress-wrap">
+                            <div class="task-progress-bar"><div class="task-progress-fill" id="progress-monetag"></div></div>
+                            <span class="task-progress-text" id="progress-text-monetag">0/30</span>
+                        </div>
                         <div class="task-footer">
-                            <span class="task-limit" id="limit-monetag">Daily limit: 30/30</span>
-                            <button class="watch-btn" onclick="watchAd('monetag')">WATCH</button>
+                            <span class="task-limit" id="limit-monetag">Daily limit: 0/30</span>
+                            <button class="watch-btn" id="btn-monetag" onclick="watchAd('monetag')">WATCH</button>
                         </div>
                     </div>
 
@@ -130,9 +138,13 @@
                             <div class="task-reward" id="reward-adexium">+0.0005 USDT</div>
                         </div>
                         <p class="task-desc">Click and view banner advertisement. Simple &amp; quick earnings!</p>
+                        <div class="task-progress-wrap">
+                            <div class="task-progress-bar"><div class="task-progress-fill" id="progress-adexium"></div></div>
+                            <span class="task-progress-text" id="progress-text-adexium">0/40</span>
+                        </div>
                         <div class="task-footer">
-                            <span class="task-limit" id="limit-adexium">Daily limit: 40/40</span>
-                            <button class="watch-btn" onclick="watchAd('adexium')">WATCH</button>
+                            <span class="task-limit" id="limit-adexium">Daily limit: 0/40</span>
+                            <button class="watch-btn" id="btn-adexium" onclick="watchAd('adexium')">WATCH</button>
                         </div>
                     </div>
 
@@ -149,9 +161,13 @@
                             <div class="task-reward" id="reward-bonus">+0.0050 USDT</div>
                         </div>
                         <p class="task-desc">Complete a special sponsored offer. Higher reward for extra effort!</p>
+                        <div class="task-progress-wrap">
+                            <div class="task-progress-bar"><div class="task-progress-fill bonus-progress" id="progress-bonus"></div></div>
+                            <span class="task-progress-text" id="progress-text-bonus">0/5</span>
+                        </div>
                         <div class="task-footer">
-                            <span class="task-limit" id="limit-bonus">Limited: 5 left</span>
-                            <button class="watch-btn bonus-btn" onclick="watchAd('bonus')">WATCH</button>
+                            <span class="task-limit" id="limit-bonus">Limited: 0/5</span>
+                            <button class="watch-btn bonus-btn" id="btn-bonus" onclick="watchAd('bonus')">WATCH</button>
                         </div>
                     </div>
                 </div>
@@ -424,6 +440,6 @@
         </div>
     </div>
 
-    <script src="/static/app.js?v=24"></script>
+    <script src="/static/app.js?v=25"></script>
 </body>
 </html>
