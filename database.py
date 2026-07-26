@@ -254,6 +254,9 @@ async def init_db():
                 VALUES (?, ?)
             """, (key, value))
 
+        # Force-set cooldown if it was set to 0 (was disabled, now enabled by default)
+        await db.execute("UPDATE admin_settings SET value = '10' WHERE key = 'ad_cooldown_seconds' AND value = '0'")
+
         await db.execute("""
             CREATE TABLE IF NOT EXISTS admin_users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
