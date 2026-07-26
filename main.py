@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import BOT_TOKEN, HOST, PORT
 from database import (
+    DB_PATH,
     add_or_update_user,
     get_user_count,
     get_user,
@@ -196,7 +197,7 @@ async def require_admin(request: Request, permission: str = None):
 def check_admin(password: str) -> bool:
     """Legacy sync check — kept for backward compatibility."""
     import sqlite3
-    conn = sqlite3.connect("bot_users.db")
+    conn = sqlite3.connect(DB_PATH)
     row = conn.execute("SELECT value FROM admin_settings WHERE key='admin_password'").fetchone()
     conn.close()
     return row and row[0] == password

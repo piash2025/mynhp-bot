@@ -6,7 +6,8 @@ from datetime import datetime, timezone
 
 import aiosqlite
 
-DB_PATH = "bot_users.db"
+DB_PATH = os.environ.get("DB_PATH", "bot_users.db")
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True) if os.path.dirname(DB_PATH) else None
 
 ADMIN_USER_IDS = [7123456789]  # Apnar Telegram user ID ekhane likhun
 
@@ -155,6 +156,18 @@ async def init_db():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+
+        default_platforms = [
+            ("AdsGram", "adsgream", "Rewarded Ad", 0.0005, 50),
+            ("Monetag", "monetag", "Rewarded Ad", 0.0005, 30),
+            ("Adexium", "adexium", "Rewarded Ad", 0.0005, 40),
+            ("Bonus", "bonus", "Bonus", 0.0050, 5),
+        ]
+        for name, slug, ad_type, rate, limit in default_platforms:
+            await db.execute("""
+                INSERT OR IGNORE INTO ad_platforms (name, slug, ad_type, rate, daily_limit, enabled)
+                VALUES (?, ?, ?, ?, ?, 1)
+            """, (name, slug, ad_type, rate, limit))
 
         await db.execute("""
             CREATE TABLE IF NOT EXISTS daily_stats (

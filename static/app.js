@@ -435,16 +435,16 @@ let currentAdNetwork = null;
 let adLoading = {};
 let loadedScripts = {};
 
-function loadAdScript(scriptCode) {
+function loadAdScript(scriptCode, network) {
     return new Promise(function(resolve, reject) {
-        if (scriptCode && !document.querySelector('script[data-ad-injected="true"]')) {
+        if (scriptCode && !document.querySelector('script[data-ad-network="' + network + '"]')) {
             var div = document.createElement('div');
             div.innerHTML = scriptCode;
             var script = div.querySelector('script');
             if (script) {
                 var newScript = document.createElement('script');
                 newScript.src = script.src;
-                newScript.dataset.adInjected = 'true';
+                newScript.dataset.adNetwork = network;
                 if (script.dataset.zone) newScript.dataset.zone = script.dataset.zone;
                 if (script.dataset.sdk) newScript.dataset.sdk = script.dataset.sdk;
                 newScript.onload = resolve;
@@ -545,7 +545,7 @@ async function watchAd(network) {
         }
 
         // Load SDK script into page
-        await loadAdScript(scriptData.script_code);
+        await loadAdScript(scriptData.script_code, network);
 
         // Find zone ID from script
         var match = scriptData.script_code.match(/data-zone=['"](\d+)['"]/);
