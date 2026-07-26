@@ -405,7 +405,7 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     top: calc(var(--header-h) + 6px);
     right: 16px;
     width: 240px;
-    background: var(--panel);
+    background: #1e293b;
     border: 1px solid var(--border);
     border-radius: 12px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.4);
