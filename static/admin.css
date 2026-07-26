@@ -371,6 +371,109 @@ body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', syste
     box-shadow: 0 4px 12px rgba(16,185,129,0.3);
 }
 
+/* ===== PROFILE DROPDOWN ===== */
+.profile-dropdown-wrap {
+    position: relative;
+}
+
+.profile-avatar-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--accent), #3b82f6);
+    border: 2px solid rgba(255,255,255,0.15);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+.profile-avatar-btn:hover {
+    border-color: var(--accent);
+    transform: scale(1.05);
+    box-shadow: 0 0 12px rgba(16,185,129,0.3);
+}
+
+.profile-avatar-icon {
+    font-size: 20px;
+    filter: grayscale(1) brightness(10);
+}
+
+.profile-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 240px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+    z-index: 1000;
+    overflow: hidden;
+    animation: dropIn 0.15s ease;
+}
+
+@keyframes dropIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.profile-dropdown-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+}
+
+.profile-dd-icon {
+    font-size: 28px;
+    filter: grayscale(1) brightness(10);
+}
+
+.profile-dd-name {
+    color: var(--text);
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.profile-dd-role {
+    color: rgba(255,255,255,0.45);
+    font-size: 12px;
+    text-transform: capitalize;
+}
+
+.profile-dropdown-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+.profile-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.75);
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.15s;
+    text-align: left;
+}
+.profile-dropdown-item:hover {
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+}
+.profile-dropdown-item.logout {
+    color: #ef4444;
+}
+.profile-dropdown-item.logout:hover {
+    background: rgba(239,68,68,0.1);
+    color: #ef4444;
+}
+
 /* ===== CONTENT AREA ===== */
 .admin-content {
     padding: 24px 28px;

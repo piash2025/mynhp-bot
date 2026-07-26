@@ -100,7 +100,42 @@ function logout() {
     document.getElementById('admin-dashboard').classList.add('hidden');
     document.getElementById('login-screen').classList.remove('hidden');
     document.getElementById('admin-password').value = '';
+    closeProfileDropdown();
     showToast('Logged out', 'info');
+}
+
+// ===== PROFILE DROPDOWN =====
+function toggleProfileDropdown() {
+    var dd = document.getElementById('profile-dropdown');
+    dd.classList.toggle('hidden');
+}
+
+function closeProfileDropdown() {
+    document.getElementById('profile-dropdown').classList.add('hidden');
+}
+
+document.addEventListener('click', function(e) {
+    var wrap = document.querySelector('.profile-dropdown-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+        closeProfileDropdown();
+    }
+});
+
+function handle2FAClick() {
+    var label = document.getElementById('twofa-dropdown-label').textContent;
+    if (label === 'Disable 2FA') {
+        open2FADisableModal();
+    } else {
+        open2FASetup();
+    }
+}
+
+function updateProfileDropdown() {
+    var meEl = document.getElementById('profile-dd-name');
+    var roleEl = document.getElementById('profile-dd-role');
+    if (window._adminRole) {
+        roleEl.textContent = window._adminRole.replace('_', ' ');
+    }
 }
 
 // ===== DASHBOARD =====
@@ -110,6 +145,9 @@ async function loadDashboard() {
         var meData = await meResp.json();
         if (!meData.error) {
             window._adminRole = meData.role;
+            window._adminUsername = meData.username;
+            document.getElementById('profile-dd-name').textContent = meData.username || 'Admin';
+            document.getElementById('profile-dd-role').textContent = (meData.role || 'admin').replace('_', ' ');
             if (meData.role !== 'super_admin') {
                 document.querySelectorAll('[data-min-role="super_admin"]').forEach(function(el) { el.style.display = 'none'; });
             }
@@ -1669,13 +1707,12 @@ async function load2FAStatus() {
     try {
         var resp = await fetch('/api/admin/2fa/status?password=' + adminToken);
         var data = await resp.json();
-        var btn = document.getElementById('twofa-btn');
+        var btn = document.getElementById('twofa-dropdown-btn');
+        var label = document.getElementById('twofa-dropdown-label');
         if (data.enabled) {
-            btn.innerHTML = '&#128274; Disable 2FA';
-            btn.onclick = function() { open2FADisableModal(); };
+            label.textContent = 'Disable 2FA';
         } else {
-            btn.innerHTML = '&#128273; Enable 2FA';
-            btn.onclick = function() { open2FASetup(); };
+            label.textContent = 'Enable 2FA';
         }
     } catch (e) {}
 }

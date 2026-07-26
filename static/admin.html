@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>mynhp_bot - Admin Panel</title>
-    <link rel="stylesheet" href="/static/admin.css?v=22">
+    <link rel="stylesheet" href="/static/admin.css?v=23">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -130,9 +130,32 @@
                         <span class="header-title" id="header-title">Analytics Dashboard</span>
                     </div>
                     <div class="header-actions">
-                        <button class="quick-add-btn" id="twofa-btn" onclick="open2FASetup()">&#128273; Enable 2FA</button>
-                        <button class="quick-add-btn" onclick="openChangePasswordModal()">&#128274; Change Password</button>
                         <button class="quick-add-btn" onclick="openPlatformModal()">&#10010; Add Platform</button>
+                        <div class="profile-dropdown-wrap">
+                            <button class="profile-avatar-btn" onclick="toggleProfileDropdown()" id="profile-avatar-btn">
+                                <span class="profile-avatar-icon">&#128100;</span>
+                            </button>
+                            <div class="profile-dropdown hidden" id="profile-dropdown">
+                                <div class="profile-dropdown-header">
+                                    <span class="profile-dd-icon">&#128100;</span>
+                                    <div>
+                                        <div class="profile-dd-name" id="profile-dd-name">Admin</div>
+                                        <div class="profile-dd-role" id="profile-dd-role">super_admin</div>
+                                    </div>
+                                </div>
+                                <div class="profile-dropdown-divider"></div>
+                                <button class="profile-dropdown-item" onclick="openChangePasswordModal(); closeProfileDropdown();">
+                                    <span>&#128274;</span> Change Password
+                                </button>
+                                <button class="profile-dropdown-item" id="twofa-dropdown-btn" onclick="handle2FAClick(); closeProfileDropdown();">
+                                    <span>&#128273;</span> <span id="twofa-dropdown-label">Enable 2FA</span>
+                                </button>
+                                <div class="profile-dropdown-divider"></div>
+                                <button class="profile-dropdown-item logout" onclick="logout();">
+                                    <span>&#128682;</span> Logout
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </header>
 
