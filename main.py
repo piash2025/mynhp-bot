@@ -474,9 +474,12 @@ async def check_ad_available(user_id: int, network: str):
         return {"available": False, "reason": "disabled"}
     platform = await get_platform_by_slug(network)
     if not platform:
-        return {"available": False, "reason": "not_configured"}
+        # Check if ANY platform exists — maybe slug mismatch
+        all_platforms = await get_all_platforms()
+        slugs = [p.get("slug", "") for p in all_platforms]
+        return {"available": False, "reason": "not_configured", "debug": "No platform with slug '" + network + "'. Available: " + ", ".join(slugs)}
     if not platform.get("script_code") and not platform.get("placement_id"):
-        return {"available": False, "reason": "no_ads"}
+        return {"available": False, "reason": "no_ads", "debug": "Platform found but script_code and placement_id both empty"}
     return {"available": True}
 
 

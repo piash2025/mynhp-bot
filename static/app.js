@@ -233,7 +233,7 @@ function updateTaskCardsUI() {
     });
 }
 
-function showNoAdsModal(network) {
+function showNoAdsModal(network, debugMsg) {
     var modal = document.getElementById('ad-modal');
     var title = document.getElementById('ad-modal-title');
     var timer = document.getElementById('ad-timer');
@@ -249,6 +249,7 @@ function showNoAdsModal(network) {
         '<p style="font-size:16px;font-weight:700;margin-top:12px;">No Ads Found</p>' +
         '<p style="color:var(--text-secondary);font-size:13px;margin-top:6px;">No ads available for this platform right now.</p>' +
         '<p style="color:var(--text-muted);font-size:12px;margin-top:10px;">Try again later</p>' +
+        (debugMsg ? '<p style="color:var(--text-muted);font-size:11px;margin-top:8px;padding:6px;background:var(--bg-input);border-radius:6px;">' + debugMsg + '</p>' : '') +
         '</div>';
     modal.classList.remove('hidden');
     setTimeout(function() {
@@ -489,7 +490,7 @@ async function watchAd(network) {
             var checkResp = await fetch('/api/user/ad-check/' + currentUser.id + '/' + network);
             var checkData = await checkResp.json();
             if (!checkData.available) {
-                showNoAdsModal(network);
+                showNoAdsModal(network, checkData.debug || checkData.reason);
                 return;
             }
         } catch (e) { /* proceed anyway */ }
